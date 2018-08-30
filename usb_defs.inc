@@ -1,22 +1,22 @@
-#define    NUM_CONFIGURATIONS    1
-#define    NUM_INTERFACES        1
-#define NUM_STRINGS            2
-#define MAX_PACKET_SIZE        8    ; maximum packet size for low-speed peripherals is 8 bytes, for full-speed peripherals it can be 8, 16, 32, or 64 bytes
+#define NUM_CONFIGURATIONS    1
+#define NUM_INTERFACES        1
+#define NUM_STRINGS           2
+#define MAX_PACKET_SIZE       8    ; maximum packet size for low-speed peripherals is 8 bytes, for full-speed peripherals it can be 8, 16, 32, or 64 bytes
 
 ; Define the states that the USB interface can be in
-#define    POWERED_STATE   0x00
-#define    DEFAULT_STATE   0x01
-#define    ADDRESS_STATE   0x02
-#define    CONFIG_STATE    0x03
+#define POWERED_STATE   0x00
+#define DEFAULT_STATE   0x01
+#define ADDRESS_STATE   0x02
+#define CONFIG_STATE    0x03
 
 ; Define the states for Control EndPoints
-#define    EP_IDLE_STATE        0x00
-#define    EP_SETUP_STATE        0x01
-#define    EP_DISABLED_STATE    0xff
+#define EP_IDLE_STATE        0x00
+#define EP_SETUP_STATE       0x01
+#define EP_DISABLED_STATE    0xff
 
-#define    ENDPT_DISABLED        0x00
+#define ENDPT_DISABLED       0x00
 #define ENDPT_IN_ONLY        0x12
-#define ENDPT_OUT_ONLY        0x14
+#define ENDPT_OUT_ONLY       0x14
 #define ENDPT_CONTROL        0x16    ; enable for in, out and setup
 #define ENDPT_NON_CONTROL    0x1E    ; enable for in, and out
 

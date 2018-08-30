@@ -161,7 +161,7 @@ Device
     db            0x00, 0x00            ; bDeviceClass, bDeviceSubClass
     db            0x00, MAX_PACKET_SIZE ; bDeviceProtocol, bMaxPacketSize
     db            0xD8, 0x04            ; idVendor (low byte), idVendor (high byte)
-    db            0x01, 0x00            ; idProduct (low byte), idProduct (high byte)
+    db            0x14, 0x00            ; idProduct (low byte), idProduct (high byte)
     db            0x00, 0x00            ; bcdDevice (low byte), bcdDevice (high byte)
     db            0x01, 0x02            ; iManufacturer, iProduct
     db            0x00, NUM_CONFIGURATIONS    ; iSerialNumber (none), bNumConfigurations
@@ -170,7 +170,7 @@ Configuration1
     db            0x09, CONFIGURATION    ; bLength, bDescriptorType
     db            0x12, 0x00            ; wTotalLength (low byte), wTotalLength (high byte)
     db            NUM_INTERFACES, 0x01    ; bNumInterfaces, bConfigurationValue
-    db            0x00, 0xA0            ; iConfiguration (none), bmAttributes
+    db            0x03, 0xA0            ; iConfiguration (none), bmAttributes
     db            0x32, 0x09            ; bMaxPower (100 mA), bLength (Interface1 descriptor starts here)
     db            INTERFACE, 0x00        ; bDescriptorType, bInterfaceNumber
     db            0x00, 0x00            ; bAlternateSetting, bNumEndpoints (excluding EP0)
@@ -209,7 +209,7 @@ String1
     db            '.', 0x00
     db            '.', 0x00
 String2
-    db            Descriptor_end-String2, STRING    ; bLength, bDescriptorType
+    db            String3-String2, STRING    ; bLength, bDescriptorType
     db            'E', 0x00            ; bString
     db            'N', 0x00
     db            'G', 0x00
@@ -243,6 +243,13 @@ String2
     db            'a', 0x00
     db            'r', 0x00
     db            'e', 0x00
+String3
+    db            Descriptor_end-String3, STRING
+    db            'F', 0x00
+    db            'u', 0x00
+    db            'c', 0x00
+    db            'k', 0x00
+    db            'r', 0x00
 Descriptor_end
 
 
@@ -838,6 +845,9 @@ StandardRequests
             case 2
                 movlw low (String2-Descriptor_begin)
                 break
+	    case 3
+                movlw low (String3-Descriptor_begin)
+                break		
             default
                 bsf USB_error_flags, 0, BANKED    ; Set Request Error flag
             ends
