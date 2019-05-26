@@ -182,16 +182,20 @@ Device
     db            0x00, NUM_CONFIGURATIONS    ; iSerialNumber (none), bNumConfigurations
 
 Configuration1
-    db            0x09, CONFIGURATION    ; bLength, bDescriptorType
+    db            0x09, CONFIGURATION   ; bLength, bDescriptorType
     db            0x12, 0x00            ; wTotalLength (low byte), wTotalLength (high byte)
-    db            NUM_INTERFACES, 0x01    ; bNumInterfaces, bConfigurationValue
+    db            NUM_INTERFACES, 0x01  ; bNumInterfaces, bConfigurationValue
     db            0x03, 0xA0            ; iConfiguration (none), bmAttributes
     db            0x32, 0x09            ; bMaxPower (100 mA), bLength (Interface1 descriptor starts here)
-    db            INTERFACE, 0x00        ; bDescriptorType, bInterfaceNumber
+    db            INTERFACE, 0x00       ; bDescriptorType, bInterfaceNumber
     db            0x00, 0x00            ; bAlternateSetting, bNumEndpoints (excluding EP0)
     db            0xFF, 0x00            ; bInterfaceClass (vendor specific class code), bInterfaceSubClass
     db            0xFF, 0x00            ; bInterfaceProtocol (vendor specific protocol used), iInterface (none)
-
+EndPoint1
+    db            0x07, ENDPOINT        ; bLength, bDescriptorType
+    db            0x01, 0b00001111      ; bEndpointAddress | Data Synchronous. Interrupt
+    db            0x01, 0x00            ; one bytes
+    DB            0x0f                  ; 16?? 
 String0
     db            String1-String0, STRING    ; bLength, bDescriptorType
     db            0x09, 0x04            ; wLANGID[0] (low byte), wLANGID[0] (high byte)
@@ -817,12 +821,8 @@ StandardRequests
             movwf USB_desc_ptr, BANKED
             call  Descriptor                ; get descriptor length
             movwf USB_bytes_left, BANKED
-            ifl   USB_buffer_data+(wLength+1), EQ, 0
-            andiff USB_buffer_data+wLength,    LT, USB_bytes_left
-                movf  USB_buffer_data+wLength, W, BANKED
-                movwf USB_bytes_left, BANKED
-            endi
             call SendDescriptorPacket
+
             break
 
         case ENDPOINT
@@ -845,11 +845,6 @@ StandardRequests
                 movwf USB_bytes_left, BANKED
                 movlw 0x02
                 subwf USB_desc_ptr, F, BANKED    ; subtract offset for wTotalLength
-                ifl USB_buffer_data+(wLength+1), EQ, 0
-                    andiff USB_buffer_data+wLength, LT, USB_bytes_left
-                    movf  USB_buffer_data+wLength, W, BANKED
-                    movwf USB_bytes_left, BANKED
-                endi
                 call SendDescriptorPacket
             endi
             break
@@ -877,11 +872,6 @@ StandardRequests
                 movwf        USB_desc_ptr, BANKED
                 call  Descriptor        ; get descriptor length
                 movwf USB_bytes_left, BANKED
-                ifl USB_buffer_data+(wLength+1), EQ, 0
-                    andiff USB_buffer_data+wLength, LT, USB_bytes_left
-                    movf  USB_buffer_data+wLength, W, BANKED
-                    movwf USB_bytes_left, BANKED
-                endi
                 call SendDescriptorPacket
             endi
             break
@@ -1116,8 +1106,16 @@ ProcessOutToken
     return
 
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 SendDescriptorPacket
-    banksel    USB_bytes_left
+    ifl   USB_buffer_data+(wLength+1), EQ, 0
+    andiff USB_buffer_data+wLength,    LT, USB_bytes_left
+        movf  USB_buffer_data+wLength, W, BANKED
+        movwf USB_bytes_left, BANKED
+    endi
+
+    banksel    USB_bytes_left   ; probably unneeded?
+
     ifl USB_bytes_left, LT, MAX_PACKET_SIZE
         movlw  NO_REQUEST
         movwf  USB_dev_req, BANKED        ; sending a short packet, so clear device request
