@@ -136,8 +136,6 @@ GET_DEVICE_DESCRIPTOR_STR:
     da "GET_DEVICE_DESCRIPTOR\n\r"
 GET_CONFIG_DESCRIPTOR_STR:
     da "GET_CONFIG_DESCRIPTOR\n\r"
-GET_ENDPOINT_DESCRIPTOR_STR:
-    da "GET_ENDPOINT_DESCRIPTOR\n\r"
 GET_STRING_DESCRIPTOR_STR:
     da "GET_STRING_DESCRIPTOR\n\r"
 SET_DEVICE_ADDRESS_STR:
@@ -183,12 +181,12 @@ Device
 
 Configuration1
     db            0x09, CONFIGURATION    ; bLength, bDescriptorType
-    db            0x12, 0x00            ; wTotalLength (low byte), wTotalLength (high byte)
+    db            0x19, 0x00            ; wTotalLength (low byte), wTotalLength (high byte)
     db            NUM_INTERFACES, 0x01    ; bNumInterfaces, bConfigurationValue
     db            0x03, 0xA0            ; iConfiguration (none), bmAttributes
     db            0x32, 0x09            ; bMaxPower (100 mA), bLength (Interface1 descriptor starts here)
     db            INTERFACE, 0x00        ; bDescriptorType, bInterfaceNumber
-    db            0x00, 0x00            ; bAlternateSetting, bNumEndpoints (excluding EP0)
+    db            0x00, 0x01            ; bAlternateSetting, bNumEndpoints (excluding EP0)
     db            0xFF, 0x00            ; bInterfaceClass (vendor specific class code), bInterfaceSubClass
     db            0xFF, 0x00            ; bInterfaceProtocol (vendor specific protocol used), iInterface (none)
 
@@ -831,9 +829,6 @@ StandardRequests
             call SendDescriptorPacket
             break
 
-        case ENDPOINT
-            PrintString GET_ENDPOINT_DESCRIPTOR_STR
-            break
         case CONFIGURATION
             PrintString GET_CONFIG_DESCRIPTOR_STR
             movf USB_buffer_data+wValue, W, BANKED
