@@ -118,16 +118,14 @@ MartyHERE:
     da "MartyHERE\n\r"
 DONE_THAT:
     da "DONE_THAT\n\r"
-CONFIG_STATE_STR:
-    da "CONFIG_NEVER_PRINT\n\r"
 USB_INITIALISED_RETRY:
     da "USB_INITIALISED_RETRY\n\r" 
 IDLE_CONDITION:
     da "IDLE_CONDITION\n\r"
-INTERRUPT_HANDLED:
-    da "Interrupt\n\r"
+SOME_PROBLEM_OR_OTHER:
+    da "UNKNOW\n\r"
 STALL_HANDSHAKE_STR:
-    da "_istall\n\r"
+    da "Stalled!\n\r"
 USB_RESET_STR:
     da "Reset.\n\r"
 TXN_COMPLETE_STR:
@@ -136,16 +134,14 @@ GET_DEVICE_DESCRIPTOR_STR:
     da "GET_DEVICE_DESCRIPTOR\n\r"
 GET_CONFIG_DESCRIPTOR_STR:
     da "GET_CONFIG_DESCRIPTOR\n\r"
-GET_ENDPOINT_DESCRIPTOR_STR:
-    da "GET_ENDPOINT_DESCRIPTOR\n\r"
 GET_STRING_DESCRIPTOR_STR:
     da "GET_STRING_DESCRIPTOR\n\r"
 SET_DEVICE_ADDRESS_STR:
     da "SET_DEVICE_ADDRESS\n\r"
-ProcessInToken_STR:
-    da "ProcessInToken\n\r"
-EP0_GET_DESC:
-    da "EP0_GET_DESC\n\r"
+PROCESS_OUT_TOKEN:
+    da "PROCESS_OUT_TOKEN\n\r"
+PROCESS_IN_TOKEN:
+    da "PROCESS_IN_TOKEN\n\r"
 EP0_SET_ADDR:
     da "EP0_SET_ADDR\n\r"
 
@@ -165,7 +161,7 @@ Descriptor
         endi
     endi
     movwf TBLPTRL, ACCESS
-   tblrd*
+    TBLRD*
     movf TABLAT, W
     return
 
@@ -183,20 +179,20 @@ Device
 
 Configuration1
     db            0x09, CONFIGURATION    ; bLength, bDescriptorType
-    db            0x12, 0x00            ; wTotalLength (low byte), wTotalLength (high byte)
+    db            0x19, 0x00            ; wTotalLength (low byte), wTotalLength (high byte)
     db            NUM_INTERFACES, 0x01    ; bNumInterfaces, bConfigurationValue
     db            0x03, 0xA0            ; iConfiguration (none), bmAttributes
     db            0x32, 0x09            ; bMaxPower (100 mA), bLength (Interface1 descriptor starts here)
     db            INTERFACE, 0x00        ; bDescriptorType, bInterfaceNumber
-    db            0x00, 0x00            ; bAlternateSetting, bNumEndpoints (excluding EP0)
+    db            0x00, 0x01            ; bAlternateSetting, bNumEndpoints (excluding EP0)
     db            0xFF, 0x00            ; bInterfaceClass (vendor specific class code), bInterfaceSubClass
     db            0xFF, 0x00            ; bInterfaceProtocol (vendor specific protocol used), iInterface (none)
 
 EndPoint1
     db            0x07, ENDPOINT        ; bLength, bDescriptorType
-    db            0x01, 0x0F            ; bEndpointAddress | Data Synchronous. Interrupt (WRONG maybe!!!!!!)
+    db            0x01, 0x0F            ; bEndpointAddr & Direction OUT Data Synchro Interrupt 
     db            0x01, 0x00            ; one bytes
-    DB            0x0f                  ; 16?? 
+    DB            0x0f                  ; ????
 
 
 
@@ -433,9 +429,11 @@ ServiceUSB
             call        ProcessSetupToken
             break
         case TOKEN_IN
+            ;PrintString PROCESS_IN_TOKEN
             call        ProcessInToken
             break
         case TOKEN_OUT
+            ;PrintString PROCESS_OUT_TOKEN
             call        ProcessOutToken
             break
         ends
@@ -831,9 +829,6 @@ StandardRequests
             call SendDescriptorPacket
             break
 
-        case ENDPOINT
-            PrintString GET_ENDPOINT_DESCRIPTOR_STR
-            break
         case CONFIGURATION
             PrintString GET_CONFIG_DESCRIPTOR_STR
             movf USB_buffer_data+wValue, W, BANKED
@@ -856,7 +851,7 @@ StandardRequests
             endi
             break
         case STRING
-            PrintString GET_STRING_DESCRIPTOR_STR
+            ;PrintString GET_STRING_DESCRIPTOR_STR
             movf USB_buffer_data+wValue, W, BANKED
             select
             case 0
@@ -1044,7 +1039,6 @@ VendorRequests
 
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ProcessInToken
-    ;PrintString ProcessInToken_STR
     banksel USB_USTAT
     movf  USB_USTAT, W, BANKED
     andlw 0x18        ; extract the EP bits
