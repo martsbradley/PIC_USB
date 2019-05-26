@@ -98,8 +98,10 @@ STARTUP     code        0x0000
     nop
     goto        $                       ; Low-priority interrupt vector trap
 
-STARTMEUP:
-    da "rSTARTMEUP\n\r"
+HELLO_WORLD:
+    da "HELLO WORLD\n\r"
+USB_INITIALISED_DONE_STR:
+    da "USB_init_done\n\r"
 POWERED_STATE_STR:
     da "POWER STATE\n\r"
 ADDRESS_STATE_STR:
@@ -108,32 +110,45 @@ DEFAULT_STATE_STR:
     da "DEFAULT STATE\n\r"
 USB_INITIALISED:
     da "USB_init_called\n\r"
-USB_INITIALISED_DONE_STR:
-    da "USB_init_done\n\r"
+SET_CONFIG:
+    da "SET_CONFIG\n\r"
+PIC_CONFIGURED:
+    da "PIC_CONFIGURED\n\r"
+MartyHERE:
+    da "MartyHERE\n\r"
+DONE_THAT:
+    da "DONE_THAT\n\r"
+CONFIG_STATE_STR:
+    da "CONFIG_NEVER_PRINT\n\r"
 USB_INITIALISED_RETRY:
     da "USB_INITIALISED_RETRY\n\r" 
-CALLING_SERVICE_USB:
-    da "CALLING_SERVICE_USB\n\r"   
 IDLE_CONDITION:
     da "IDLE_CONDITION\n\r"
 INTERRUPT_HANDLED:
-    da "_int\n\r"
-START_OF_FRAME:
-    da "_start"
-CONFIG_STATE_STR:
-    da "_config"
+    da "Interrupt\n\r"
 STALL_HANDSHAKE_STR:
-    da "_stall"
+    da "_istall\n\r"
 USB_RESET_STR:
-    da "_reset\n\r"
+    da "Reset.\n\r"
 TXN_COMPLETE_STR:
-    da "TXN_COMPLETE_STR\n\r"    
-   
-EAGLE_HAS_LANDED:
-    da "EAGLE_HAS_LANDED\n\r"
-ProcessSetupToken_STR:
-      da "ProcessSetupToken_STR\n\r"
-    
+    da "TXN_COMPLETE\n\r"    
+GET_DEVICE_DESCRIPTOR_STR:
+    da "GET_DEVICE_DESCRIPTOR\n\r"
+GET_CONFIG_DESCRIPTOR_STR:
+    da "GET_CONFIG_DESCRIPTOR\n\r"
+GET_ENDPOINT_DESCRIPTOR_STR:
+    da "GET_ENDPOINT_DESCRIPTOR\n\r"
+GET_STRING_DESCRIPTOR_STR:
+    da "GET_STRING_DESCRIPTOR\n\r"
+SET_DEVICE_ADDRESS_STR:
+    da "SET_DEVICE_ADDRESS\n\r"
+ProcessInToken_STR:
+    da "ProcessInToken\n\r"
+EP0_GET_DESC:
+    da "EP0_GET_DESC\n\r"
+EP0_SET_ADDR:
+    da "EP0_SET_ADDR\n\r"
+
 USBSTUFF    code
 Descriptor
     movlw   upper Descriptor_begin
@@ -150,7 +165,7 @@ Descriptor
         endi
     endi
     movwf TBLPTRL, ACCESS
-    tblrd*
+   tblrd*
     movf TABLAT, W
     return
 
@@ -245,11 +260,15 @@ String2
     db            'e', 0x00
 String3
     db            Descriptor_end-String3, STRING
-    db            'F', 0x00
-    db            'u', 0x00
+    db            'M', 0x00
+    db            'y', 0x00
+    db            ' ', 0x00
     db            'c', 0x00
-    db            'k', 0x00
-    db            'r', 0x00
+    db            'o', 0x00
+    db            'n', 0x00
+    db            'f', 0x00
+    db            'i', 0x00
+    db            'g', 0x00
 Descriptor_end
 
 
@@ -259,13 +278,9 @@ ServiceUSB
     select
     caseset    UIR, UERRIF, ACCESS    ;  If there is an interrupt.
         clrf   UEIR, ACCESS           ;  Clear the error in software.
-	PrintString INTERRUPT_HANDLED
-	
         break
     caseset    UIR, SOFIF, ACCESS     ;  Start of Frame token received by SIE
         bcf    UIR, SOFIF, ACCESS     ;  Clear this flag 
-	;PrintString START_OF_FRAME
-	
         break
     caseset    UIR,  IDLEIF, ACCESS   ;  Idle condition detected (been idle for 3ms or more)
         bcf    UIR,  IDLEIF, ACCESS   ;  Clear that idle condition.
@@ -300,7 +315,6 @@ ServiceUSB
             break
         case CONFIG_STATE
             movlw    0x08
-	  ;  PrintString CONFIG_STATE_STR
         ends
         iorwf  PORTB, F, ACCESS        ;  Update the port to reflect the state.
 #endif
@@ -367,7 +381,7 @@ ServiceUSB
     #endif
         break
     caseset  UIR, TRNIF, ACCESS    ; Processing of pending transaction is complete; 
-	;PrintString TXN_COMPLETE_STR
+;       PrintString TXN_COMPLETE_STR
         movlw    0x04
         movwf    FSR0H, ACCESS     ; Indirect addressing,
         movf     USTAT, W, ACCESS  ; Read USTAT register for endpoint information
@@ -430,7 +444,6 @@ ServiceUSB
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ProcessSetupToken
     
-    PrintString ProcessSetupToken_STR
     banksel  USB_buffer_data
     movf     USB_buffer_desc+ADDRESSH, W, BANKED
     movwf    FSR0H, ACCESS
@@ -781,6 +794,7 @@ StandardRequests
         ifset USB_buffer_data+wValue, 7, BANKED        ; if new device address is illegal, send Request Error
             bsf USB_error_flags, 0, BANKED    ; set Request Error flag
         otherwise
+            PrintString SET_DEVICE_ADDRESS_STR
             movlw   SET_ADDRESS
             movwf   USB_dev_req, BANKED           ; processing a set address request
             movf    USB_buffer_data+wValue, W, BANKED
@@ -798,6 +812,7 @@ StandardRequests
         movf  USB_buffer_data+(wValue+1), W, BANKED
         select
         case DEVICE
+            PrintString GET_DEVICE_DESCRIPTOR_STR
             movlw low (Device-Descriptor_begin)
             movwf USB_desc_ptr, BANKED
             call  Descriptor                ; get descriptor length
@@ -809,7 +824,12 @@ StandardRequests
             endi
             call SendDescriptorPacket
             break
+
+        case ENDPOINT
+            PrintString GET_ENDPOINT_DESCRIPTOR_STR
+            break
         case CONFIGURATION
+            PrintString GET_CONFIG_DESCRIPTOR_STR
             movf USB_buffer_data+wValue, W, BANKED
             select
             case 0
@@ -834,6 +854,7 @@ StandardRequests
             endi
             break
         case STRING
+            PrintString GET_STRING_DESCRIPTOR_STR
             movf USB_buffer_data+wValue, W, BANKED
             select
             case 0
@@ -888,6 +909,7 @@ StandardRequests
 
     ; >>>>  STANDARD REQUESTS  <<<< ;
     case SET_CONFIGURATION
+        PrintString SET_CONFIG
         ifl USB_buffer_data+wValue, LE, NUM_CONFIGURATIONS
             clrf  UEP1, ACCESS        ; clear all EP control registers except for EP0 to disable EP1-EP15 prior to setting configuration
             clrf  UEP2, ACCESS
@@ -1024,6 +1046,7 @@ VendorRequests
 
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ProcessInToken
+    ;PrintString ProcessInToken_STR
     banksel USB_USTAT
     movf  USB_USTAT, W, BANKED
     andlw 0x18        ; extract the EP bits
@@ -1032,6 +1055,7 @@ ProcessInToken
         movf USB_dev_req, W, BANKED
         select
         case SET_ADDRESS
+            PrintString EP0_SET_ADDR
             movf   USB_address_pending, W, BANKED
             movwf  UADDR, ACCESS
             select
@@ -1055,6 +1079,8 @@ ProcessInToken
             ends
             break
         case GET_DESCRIPTOR
+            ; print statements here seem to cause
+            ; issues - maybe affecting timing 
             call SendDescriptorPacket
             break
         ends
@@ -1148,6 +1174,7 @@ InitUSB
 	PrintString USB_INITIALISED_RETRY
 	call Delay
     untilclr    UCON, SE0, ACCESS          ;   ...until initial SE0 condition clears.
+                                           ;   SE0 == Single Ended Zero
     return
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++    
 Main
@@ -1156,33 +1183,26 @@ Main
     movwf       ADCON1, ACCESS    ; Set up PORTA to be digital I/Os rather than A/D converter.
     clrf        TRISA,  ACCESS    ; Set up all PORTA pins to be digital outputs.
     
-    
-    
-    
     call	InitUsartComms
-    PrintString STARTMEUP
+    PrintString HELLO_WORLD
     
     call        InitUSB           ; Initialize the USB registers and serial interface engine.
     PrintString USB_INITIALISED_DONE_STR
+
     repeat
-	;PrintString CALLING_SERVICE_USB
         call     ServiceUSB       ; Service USB requests...
         banksel  USB_USWSTAT
-	
-;	call Delay
- 
-	
     until USB_USWSTAT, EQ, CONFIG_STATE  ; ...until the host configures the peripheral
     
+    PrintString PIC_CONFIGURED
     
-    PrintString EAGLE_HAS_LANDED
-    
-    
-
     bsf         PORTA, 0, ACCESS      ; set RA0 high
     banksel     COUNTER_L
     clrf        COUNTER_L, BANKED
     clrf        COUNTER_H, BANKED
+
+    PrintString MartyHERE
+
     repeat
         banksel COUNTER_L
         incf    COUNTER_L, F, BANKED
@@ -1195,6 +1215,8 @@ Main
             bsf PORTA, 1, ACCESS
         endi
         call   ServiceUSB
+
+        ;PrintString DONE_THAT
     forever
 
     end
