@@ -95,9 +95,9 @@ InterruptTransmitRS232Ready:
     tblrd*+	
     movf TABLAT, W, ACCESS    
 
-   ;addlw 0x00              ; Check for end of string \0 character
-   ;btfsc STATUS,Z, ACCESS  ; If zero bit is set, execute the goto
-   ;goto InterruptRS232TxDone
+    addlw 0x00              ; Check for end of string \0 character
+    btfsc STATUS,Z, ACCESS  ; If zero bit is set, execute the goto
+    goto InterruptRS232TxDone
 
     movwf TXREG,ACCESS    ; Send the data
 
@@ -118,7 +118,7 @@ InterruptRS232TxDone:
     ; The entire string has been transmitted, so disable TXIE.
     ; When the next string is sent TXIE will be enabled again.
 
-    ;bcf PIE1, TXIE          ; Disable interrupt
+    bcf PIE1, TXIE          ; Disable interrupt
     bcf TXSTA, TXEN, ACCESS ; Disable transmission.
 
 InterruptServiceEnd:
