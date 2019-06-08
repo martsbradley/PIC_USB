@@ -4,7 +4,7 @@
 
 PrintString macro string
     movlw upper string
-    movwf TBLPTRH, ACCESS
+    movwf TBLPTRU, ACCESS 
     movlw high string
     movwf TBLPTRH, ACCESS
     movlw low  string

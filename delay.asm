@@ -1,4 +1,4 @@
-#include <p18f2550.inc>
+#include p18f2550.inc
  
      global Delay
 
@@ -6,7 +6,7 @@ BANK0 udata
 CounterA  res 1     ; string being printed.
 CounterB  res 1
   
-PROG  code
+DELAY_CODE  code
 
 Delay:    ; Currently configured for a one second delay.
     banksel CounterA

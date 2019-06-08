@@ -1,4 +1,4 @@
-#include <p18f2550.inc>
+#include p18f2550.inc
 #include util_macros.inc
      global print, InitUsartComms, RS232_SendByte
 
@@ -8,9 +8,37 @@ printchar_hi  res 1     ; string being printed.
 printchar_lo  res 1
 PrintCounter1 res 1
  
-PROG  code
+RS232_CODE  code
 
- 
+; To make this RS232 transmission interrupt driven
+; create three bytes that  hold the upper middle and 
+; lower portions of address of the string to be printed.
+; 
+; The table registers are adjusted by the handler 
+; so these will need saved and restored by the 
+; interrupt handler.
+
+;         TBLPTRU TBLPTRH TBLPTRL
+;
+;
+; 
+;
+; Ensure that the PIR1,TXIF is 1 so ready to send.
+; Update the three registers with the address of the
+;
+; The upper/high/low address of the string will be stored 
+; to three rs232 registers RS232PTRU RS232PTRH RS232PTRL
+;
+; InterruptHandler:
+;    Populate the TBLPTR registers from RS232PTR U/H/L
+;    Lookup table to get the byte for W
+;    Write out the data from W.
+;    copy the latest TBLPTR registers to the RS232PTR U/H/L
+;    Check for zero, clear interrupt flag.
+;    Copy the byte to TXREG  
+;
+
+
     
 lookupX:
     TBLRD*+	
@@ -58,3 +86,25 @@ InitUsartComms:                        ; Setup the usart hardware
     return
 
     END                     ;Stop assembling here
+
+
+
+;   INTCON:
+;   GIE
+;   1 = Enables all unmasked interrupts
+
+;   IPEN
+;   1 = Enables all unmasked peripheral interrupts
+
+
+
+;   PIR1
+;   TXIF: EUSART Transmit Interrupt Flag bit
+;   1 = The EUSART transmit buffer, TXREG, is empty (cleared when TXREG is written)
+;   0 = The EUSART transmit buffer is full
+
+
+
+;   PIE1:
+;   TXIE: EUSART Transmit Interrupt Enable bit
+;   1 = Enables the EUSART transmit interrupt
