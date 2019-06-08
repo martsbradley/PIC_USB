@@ -16,7 +16,8 @@
     config EBTR0 = OFF,EBTR1 = OFF,EBTR2 = OFF,EBTR3 = OFF,EBTRB = OFF
 
     
-    extern InitUsartComms, print, Delay,InterruptServiceRoutine
+    extern InitUsartComms, print, InterruptServiceRoutine
+    extern DelayOneSecond, DelayTenthSecond
     
 .udata   
     COUNTER_H           res    1
@@ -27,40 +28,51 @@ LAUNCH_PROGRAM code     0x00
     goto        Main                    
     nop
     nop
-    goto        $                    ; High-priority interrupt vector trap
-    nop
-    nop
-    nop
-    nop
-    nop
-    nop
     goto        InterruptServiceRoutine
+    nop
+    nop
+    nop
+    nop
+    nop
+    nop
+    goto        $
 
 
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 MAIN_PROGRAM code
 
-HELLO_WORLD:
-    da "HELLO WORLD\n\r"
-DONE_THAT:
-    da "DONE_THAT:\n\r"
-MartyHERE:
-    da "MartyHERE\n\r"
+ONE:
+    da "One\n\r"
+TWO:
+    da "Two\n\r"
+THREE:
+    da "Three\n\r"
 
 Main
-    clrf        PORTA,  ACCESS
-    movlw       0x0F
-    movwf       ADCON1, ACCESS    ; Set up PORTA to be digital I/Os rather than A/D converter.
-    clrf        TRISA,  ACCESS    ; Set up all PORTA pins to be digital outputs.
+    call DelayOneSecond
+    clrf   PORTA,  ACCESS
+    movlw  0x0F
+    movwf  ADCON1, ACCESS    ; Set up PORTA to be digital I/Os rather than A/D converter.
+    clrf   TRISA,  ACCESS    ; Set up all PORTA pins to be digital outputs.
     
-    call	InitUsartComms
-    PrintString HELLO_WORLD
 
-    PrintString MartyHERE
+    bcf    RCON, IPEN            ; Disable priority levels on interrupts.
+    bsf    INTCON, GIE           ; Enable all unmasked interrupts.
+    bsf    INTCON, PEIE          ; Enables all unmasked peripheral interrupts.
 
-    repeat
-        call Delay
-        PrintString DONE_THAT
-    forever
+    call   InitUsartComms
+
+
+HERE:
+    PrintString ONE
+    call DelayTenthSecond
+    call DelayTenthSecond
+    PrintString TWO
+    call DelayTenthSecond
+    call DelayTenthSecond
+    PrintString THREE
+    call DelayTenthSecond
+    call DelayTenthSecond
+    goto HERE
 
     end

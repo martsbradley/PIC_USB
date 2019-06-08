@@ -1,7 +1,4 @@
 
-
-
-
 PrintString macro string
     movlw upper string
     movwf TBLPTRU, ACCESS 

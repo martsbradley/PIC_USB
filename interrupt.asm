@@ -6,6 +6,9 @@
     ;extern this_capture32, CaptureCounter, timer1_overflow
 
     global InterruptServiceRoutine
+    global RS232_PTRU
+    global RS232_PTRH
+    global RS232_PTRL
 
 ACCESS_DATA  udata_acs
 W_TEMP       res 1
@@ -25,6 +28,13 @@ RS232_PTRL   res 1
 INTERRUPT_CODE  code
 ;--------------------------------------------------------------------------
 ; Interrupt Service Routine
+;
+;
+;
+;
+;   PIE1:
+;   TXIE: EUSART Transmit Interrupt Enable bit
+;   1 = Enables the EUSART transmit interrupt
 ;--------------------------------------------------------------------------
 InterruptServiceRoutine:
 
@@ -52,8 +62,14 @@ InterruptServiceRoutine:
     MOVWF TABLAT_TEMP
 
 InterruptTransmitRS232Ready:
-    btfsc PIE1, TXIE     ;if TXIE == 0 skip next because it is not enabled.
-    btfss PIR1, TXIF     ;if TXIR == 1 skip next because ready to transmit.
+
+;   PIR1:TXIF: EUSART Transmit Interrupt Flag bit
+;   1 = The EUSART transmit buffer, TXREG, is empty (cleared when TXREG is written)
+;   0 = The EUSART transmit buffer is full
+
+
+    btfsc PIE1, TXIE     ;skip if TXIE == 0 skip next because it is not enabled.
+    btfss PIR1, TXIF     ;skip if TXIR == 1 TXREG is empty
     goto InterruptServiceEnd
 
     ; Now need to restore the saved RS232 table pointers to the table
@@ -68,13 +84,13 @@ InterruptTransmitRS232Ready:
     movwf TBLPTR
 
     tblrd*+	
-    MOVF TABLAT, W, ACCESS    
+    movf TABLAT, W, ACCESS    
 
     addlw 0x00              ; Check for end of string \0 character
-    btfsc STATUS,Z, ACCESS
+    btfsc STATUS,Z, ACCESS  ; If zero bit is set, execute the goto
     goto InterruptRS232TxDone
 
-    movwf   TXREG,ACCESS    ; Send the data
+    movwf TXREG,ACCESS    ; Send the data
 
     ; Now that the TBLPTR has been incremented, save it again into the RS232 Registers.
 
@@ -87,6 +103,7 @@ InterruptTransmitRS232Ready:
     movf TBLPTR, W
     movwf RS232_PTRL
 
+    goto InterruptServiceEnd
 
 InterruptRS232TxDone:
     ; The entire string has been transmitted, so disable TXIE.
@@ -117,68 +134,3 @@ InterruptServiceEnd:
     retfie
 
     end
-
-
-
-
-;   InterruptPortChange:
-;       btfsc INTCON, RBIE       ;if RBIE == 0 skip next
-;       btfss INTCON, RBIF       ;if RBIF == 1 skip next
-;       goto  InterruptTimer0
-;       bcf   INTCON, RBIF       ;clear the interrupt flag.
-;       btfss PORTB, RB5         ;if Adjust !pressed check if Set pressed
-;       goto  InterruptPortChangeStartTimer
-;       btfsc PORTB, RB4         ;if Set pressed skip next
-;       goto  InterruptServiceEnd
-;   InterruptPortChangeStartTimer:
-;       bcf   INTCON, RBIE       ; Prevent interrupt on change
-;       movlw d'60'              ; 255 - 195 = 60   [ 50 ms is ~     ]
-;       ;MOVFmovfw TMR0               ; Start the timer. [ 195 * 256mills ]
-;       bsf   INTCON, TMR0IE     ; Enable timer0 interrupt
-;       goto  InterruptServiceEnd
-;   InterruptTimer0:
-;       btfsc INTCON, TMR0IE     ; if TMR0IE = 0 skip next
-;       btfss INTCON, TMR0IF     ; if TMR0IF = 1 skip next
-;       goto  InterruptCapturePin1
-;       bcf   INTCON, TMR0IE     ; Stop Timer0 Interrupts
-;       clrf  TMR0               ; clear the counter for T0
-;       bcf   INTCON, TMR0IF     ; clear the interrupt
-;   InterruptTimer0CheckButton4:
-;       btfsc PORTB, RB5         ; was button 4 pressed
-;       goto  InterruptTimer0CheckButton5
-;       ;movwf ButtonPressedValue
-;       goto  InterruptServiceEnd
-;   InterruptTimer0CheckButton5:
-;       btfsc PORTB, RB4         ; was button 5 pressed
-;       goto  InterruptServiceEnd
-;       ;movlw BUTTON_RB4_SET_PRESSED
-;       ;movwf ButtonPressedValue
-;       goto InterruptServiceEnd
-
-;   InterruptCapturePin1:
-;       btfss PIR1, CCP1IF
-;       goto InterruptTimer1
-;       bcf   PIR1, CCP1IF
-
-;       ;incf  CaptureCounter,f
-
-;       ;clear32bitReg this_capture32
-;       ;movfw CCPR1L           ;Grab the time of the
-;       ;movwf this_capture32   ;Capture into this_capture32.
-;       ;movfw CCPR1H
-;       ;movwf this_capture32+1;
-
-;       goto InterruptServiceEnd
-
-
-;   InterruptTimer1:
-;       btfss PIR1, TMR1IF
-;       goto InterruptTimer1End
-;       banksel PIE1                ;bank 1
-;       btfss PIE1, TMR1IE
-;       goto InterruptTimer1End
-;       banksel TMR0                ;bank0
-;       bcf  PIR1,TMR1IF
-;       ;incf timer1_overflow,f
-;   InterruptTimer1End:
-;       banksel TMR0    ;bank0
