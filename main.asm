@@ -1,6 +1,7 @@
     list p=18f2550
     #include p18f2550.inc
     #include rs232.inc
+
     errorlevel -207
     config PLLDIV = 1, CPUDIV = OSC1_PLL2 , USBDIV = 2,FOSC = XT_XT 
     config IESO = OFF,PWRT = OFF,BOR = OFF, VREGEN = OFF,WDT = OFF,WDTPS = 32768   ;  I turned this off!!!
@@ -28,18 +29,20 @@ LAUNCH_PROGRAM code     0x00
     goto        Main                    
     nop
     nop
-    goto        InterruptServiceRoutine
+    goto        InterruptServiceRoutine  ; Address 0x08 low interrupt vector
     nop
     nop
     nop
     nop
     nop
     nop
-    goto        $
-
-
+    goto        $    ; Address 0x18 High interrupt vector
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 MAIN_PROGRAM code
+
+LAUNCH_MISSLES:
+    da "Launch_missles\n\r"
 
 ONE:
     da "One\n\r"
@@ -59,20 +62,18 @@ Main
     bcf    RCON, IPEN            ; Disable priority levels on interrupts.
     bsf    INTCON, GIE           ; Enable all unmasked interrupts.
     bsf    INTCON, PEIE          ; Enables all unmasked peripheral interrupts.
+    bsf    PIE1, TXIE            ; Enable transmission interrupts.
 
     call   InitUsartComms
 
-
+    PrintString LAUNCH_MISSLES
 HERE:
     PrintString ONE
-    call DelayTenthSecond
-    call DelayTenthSecond
+    call DelayOneSecond
     PrintString TWO
-    call DelayTenthSecond
-    call DelayTenthSecond
+    call DelayOneSecond
     PrintString THREE
-    call DelayTenthSecond
-    call DelayTenthSecond
+    call DelayOneSecond
     goto HERE
 
     end

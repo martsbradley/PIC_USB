@@ -9,6 +9,9 @@
     global RS232_PTRU
     global RS232_PTRH
     global RS232_PTRL
+    global SHADOW_RS232_PTRU
+    global SHADOW_RS232_PTRH
+    global SHADOW_RS232_PTRL
 
 ACCESS_DATA  udata_acs
 W_TEMP       res 1
@@ -20,9 +23,15 @@ TBLPTRH_TEMP res 1
 TBLPTR_TEMP  res 1
 TABLAT_TEMP  res 1
 
-RS232_PTRU   res 1  ; These store the current print head of the RS232 output.
-RS232_PTRH   res 1
-RS232_PTRL   res 1
+
+SHADOW_RS232_PTRU   res 1  ; The Macro PrintString will overwrite these without
+SHADOW_RS232_PTRH   res 1  ; checking if the printing is currently using the
+SHADOW_RS232_PTRL   res 1  ; variables below.  The function print
+                           ; will overwrite the variables below if they are
+                           ; not currently in use.
+RS232_PTRU          res 1  ; These store the current print head of the RS232 output.
+RS232_PTRH          res 1
+RS232_PTRL          res 1
 
    
 INTERRUPT_CODE  code
@@ -68,8 +77,8 @@ InterruptTransmitRS232Ready:
 ;   0 = The EUSART transmit buffer is full
 
 
-    btfsc PIE1, TXIE     ;skip if TXIE == 0 skip next because it is not enabled.
-    btfss PIR1, TXIF     ;skip if TXIR == 1 TXREG is empty
+    ;btfsc PIE1, TXIE     ;skip if TXIE == 0 skip next because it is not enabled.
+    btfss PIR1, TXIF     ;skip if TXIF == 1 means that TXREG is empty
     goto InterruptServiceEnd
 
     ; Now need to restore the saved RS232 table pointers to the table
@@ -86,9 +95,9 @@ InterruptTransmitRS232Ready:
     tblrd*+	
     movf TABLAT, W, ACCESS    
 
-    addlw 0x00              ; Check for end of string \0 character
-    btfsc STATUS,Z, ACCESS  ; If zero bit is set, execute the goto
-    goto InterruptRS232TxDone
+   ;addlw 0x00              ; Check for end of string \0 character
+   ;btfsc STATUS,Z, ACCESS  ; If zero bit is set, execute the goto
+   ;goto InterruptRS232TxDone
 
     movwf TXREG,ACCESS    ; Send the data
 
@@ -108,7 +117,9 @@ InterruptTransmitRS232Ready:
 InterruptRS232TxDone:
     ; The entire string has been transmitted, so disable TXIE.
     ; When the next string is sent TXIE will be enabled again.
-    bcf PIE1, TXIE     
+
+    ;bcf PIE1, TXIE          ; Disable interrupt
+    bcf TXSTA, TXEN, ACCESS ; Disable transmission.
 
 InterruptServiceEnd:
 

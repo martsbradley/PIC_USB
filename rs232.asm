@@ -5,6 +5,10 @@
     extern RS232_PTRH
     extern RS232_PTRL
 
+    extern SHADOW_RS232_PTRU
+    extern SHADOW_RS232_PTRH
+    extern SHADOW_RS232_PTRL
+
 
 ; To make this RS232 transmission interrupt driven
 ; create three bytes that hold the upper middle and 
@@ -35,23 +39,20 @@
 RS232_CODE  code
 
 print:
-    btfsc PIE1, TXIE     ; skip next if TXIE == 0 skip prints if tx is busy
-    return
+    ;btfsc PIE1, TXIE     ; skip next if TXIE == 0 skip prints if tx is busy
+   ;btfsc TXSTA, TXEN    ; skip next if TXEN == 0 skip prints if tx is busy
+   ;return
 
-    tblrd*+	         ; Get the data byte and move the TBLPTR onto the next byte.
-
-    movf TBLPTRU, W      ; Now that the TBLPTR has been incremented, store it
-    movwf RS232_PTRU     ; in the RS232 registers, when the transmission is done
-                         ; an interrupt will use the RS232 registers to get the
-    movf TBLPTRH, W      ; next byte for transmission.
+    movf SHADOW_RS232_PTRU, W  
+    movwf RS232_PTRU           
+                               
+    movf SHADOW_RS232_PTRH, W  
     movwf RS232_PTRH
 
-    movf TBLPTR, W
+    movf SHADOW_RS232_PTRL, W
     movwf RS232_PTRL
 
-    movf  TABLAT, W, ACCESS ; Get data from table register  
-    movwf TXREG,ACCESS      ; Send the data
-    bsf   PIE1, TXIE        ; Enable the interupts.
+    bsf TXSTA, TXEN, ACCESS  ; Enable transmission, causes an interrupt.
     return
     
 ;  printNewLine:
@@ -65,7 +66,7 @@ InitUsartComms:                 ; Setup the usart hardware
     banksel TXSTA
     movlw 0x19                  ; BAUD 9600 & FOSC 4000000L
     movwf SPBRG,ACCESS          ; 8 bit communication rather than 9bit
-    movlw 0x24
+    movlw 0x04                  ; TXEN = 0
     movwf TXSTA,ACCESS          ; Asynchronous, TXEN
     banksel RCSTA
     movlw 0x90                  ; DIVIDER ((int)(FOSC/(16UL * BAUD) -1))
