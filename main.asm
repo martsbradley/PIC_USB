@@ -15,10 +15,12 @@
     config WRT0 = OFF, WRT1 = OFF, WRT2 = OFF, WRT3 = OFF
     config WRTB = OFF, WRTC = OFF, WRTD = OFF
     config EBTR0 = OFF,EBTR1 = OFF,EBTR2 = OFF,EBTR3 = OFF,EBTRB = OFF
-
     
     extern InitUsartComms, print, InterruptServiceRoutine
     extern DelayOneSecond, DelayTenthSecond
+    extern SHADOW_RS232_PTRU
+    extern SHADOW_RS232_PTRH
+    extern SHADOW_RS232_PTRL
     
 .udata   
     COUNTER_H           res    1
@@ -36,20 +38,17 @@ LAUNCH_PROGRAM code     0x00
     nop
     nop
     nop
-    goto        $    ; Address 0x18 High interrupt vector
+    goto        Main
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 MAIN_PROGRAM code
 
-LAUNCH_MISSLES:
-    da "Launch_missles\n\r"
-
+XXA:
+   da "K"
 ONE:
-    da "One\n\r"
-TWO:
-    da "Two\n\r"
-THREE:
-    da "Three\n\r"
+    da "Mary\n\r"
+XXB:
+   da "R"
 
 Main
     call DelayOneSecond
@@ -58,22 +57,25 @@ Main
     movwf  ADCON1, ACCESS    ; Set up PORTA to be digital I/Os rather than A/D converter.
     clrf   TRISA,  ACCESS    ; Set up all PORTA pins to be digital outputs.
     
-
-    bcf    RCON, IPEN            ; Disable priority levels on interrupts.
-    bsf    INTCON, GIE           ; Enable all unmasked interrupts.
-    bsf    INTCON, PEIE          ; Enables all unmasked peripheral interrupts.
-    bsf    PIE1, TXIE            ; Enable transmission interrupts.
-
     call   InitUsartComms
 
-    PrintString LAUNCH_MISSLES
+    bcf    RCON, IPEN,   ACCESS            ; Disable priority levels on interrupts.
+    bsf    INTCON, GIE,  ACCESS           ; Enable all unmasked interrupts.
+    bsf    INTCON, PEIE, ACCESS          ; Enables all unmasked peripheral interrupts.
+    bcf    PIE1, TXIE ,  ACCESS           ; Enable transmission interrupts.
+
+
 HERE:
-    PrintString ONE
+    movlw upper ONE
+    movwf SHADOW_RS232_PTRU, ACCESS 
+    movlw high ONE
+    movwf SHADOW_RS232_PTRH, ACCESS
+    movlw low  ONE
+    movwf SHADOW_RS232_PTRL, ACCESS
+
+    call print
     call DelayOneSecond
-    PrintString TWO
-    call DelayOneSecond
-    PrintString THREE
-    call DelayOneSecond
+
     goto HERE
 
     end

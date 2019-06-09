@@ -39,8 +39,8 @@
 RS232_CODE  code
 
 print:
-    ;btfsc PIE1, TXIE     ; skip next if TXIE == 0 skip prints if tx is busy
-    btfsc TXSTA, TXEN    ; skip next if TXEN == 0 skip prints if tx is busy
+    btfss PIE1, TXIE , ACCESS   ; skip next if TXIE == 1 skip prints if tx is busy
+    btfsc TXSTA, TXEN, ACCESS   ; skip next if TXEN == 0 skip prints if tx is busy
     return
 
     movf SHADOW_RS232_PTRU, W  
@@ -52,7 +52,7 @@ print:
     movf SHADOW_RS232_PTRL, W
     movwf RS232_PTRL
 
-    bsf PIE1, TXIE           ; Enable interrupt
+    bsf PIE1, TXIE, ACCESS   ; Enable interrupt
     bsf TXSTA, TXEN, ACCESS  ; Enable transmission, causes an interrupt.
     return
     
@@ -75,5 +75,3 @@ InitUsartComms:                 ; Setup the usart hardware
     return
 
     END                         ;Stop assembling here
-
-
