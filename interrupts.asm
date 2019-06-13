@@ -75,11 +75,10 @@ InterruptServiceRoutine:
     CLRF TABLAT, ACCESS
 
 InterruptTransmitRS232Ready:
-    btfsc PIR1, TXIF, ACCESS ;skip if TXIF == 0 means that TXREG is empty
-    btfss PIE1, TXIE, ACCESS ;skip if TXIE == 1 skip next because it is enabled.
+    btfss PIR1, TXIF, ACCESS ;skip if TXIF == 1 means that TXREG is empty
     goto InterruptServiceEnd
 
-    btfss TXSTA, TXEN, ACCESS ;skip if TXEN == 1 because transmission enabled.
+    btfss PIE1, TXIE, ACCESS ;skip if TXIE == 1 because transmission enabled.
     goto InterruptServiceEnd
 
 
@@ -126,6 +125,14 @@ InterruptRS232TxDone:
     ; When the next string is sent TXIE will be enabled again.
 
 
+
+WaitHere:
+
+    btfss TXSTA, TRMT, ACCESS ;   TSR is set when TSR is empty
+    goto WaitHere
+
+    bcf TXSTA, TXEN, ACCESS ; Disable transmission.
+
     clrf RS232_PTRU, ACCESS
     clrf RS232_PTRH, ACCESS
     clrf RS232_PTRL, ACCESS
@@ -133,11 +140,10 @@ InterruptRS232TxDone:
     clrf TBLPTRH, ACCESS
     clrf TBLPTRL, ACCESS
     
-    bcf TXSTA, TXEN, ACCESS ; Disable transmission.
-    bcf PIE1, TXIE, ACCESS  ; Disable interrupt
+    ;bcf PIE1, TXIE, ACCESS  ; Disable interrupt
 
-   ;movlw 0xAB;             ; Writing something noticable to TXREG clears TXIF.
-   ;movwf TXREG,ACCESS      ; 0xAB should not be output.
+    ;movlw 0xAB;             ; Writing something noticable to TXREG clears TXIF.
+    ;movwf TXREG,ACCESS      ; 0xAB should not be output.
 
 InterruptServiceEnd:
 

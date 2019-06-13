@@ -48,7 +48,7 @@ XXA:
 ONE:
     da "Mary\n\r"
 XXB:
-   da "R"
+   da "K"
 
 Main
     call DelayOneSecond
@@ -62,7 +62,7 @@ Main
     bcf    RCON, IPEN,   ACCESS            ; Disable priority levels on interrupts.
     bsf    INTCON, GIE,  ACCESS           ; Enable all unmasked interrupts.
     bsf    INTCON, PEIE, ACCESS          ; Enables all unmasked peripheral interrupts.
-    bcf    PIE1, TXIE ,  ACCESS           ; Enable transmission interrupts.
+    bsf    PIE1, TXIE ,  ACCESS           ; Enable transmission interrupts.
 
 
 HERE:
