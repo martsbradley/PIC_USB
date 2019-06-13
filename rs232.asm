@@ -58,7 +58,7 @@ print:
     movf SHADOW_RS232_PTRL, W
     movwf RS232_PTRL
 
-    ;bsf PIE1, TXIE, ACCESS   ; Enable interrupt
+    bsf PIE1, TXIE , ACCESS  ; Enable interrupts
     bsf TXSTA, TXEN, ACCESS  ; Enable transmission, causes an interrupt.
     return
     

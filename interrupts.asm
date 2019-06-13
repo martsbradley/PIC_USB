@@ -75,7 +75,7 @@ InterruptServiceRoutine:
     CLRF TABLAT, ACCESS
 
 InterruptTransmitRS232Ready:
-    btfss PIR1, TXIF, ACCESS ;skip if TXIF == 1 means that TXREG is empty
+    btfss PIR1, TXIF, ACCESS ;skip if TXIF == 1 means ready to send another byte.
     goto InterruptServiceEnd
 
     btfss PIE1, TXIE, ACCESS ;skip if TXIE == 1 because transmission enabled.
@@ -124,6 +124,7 @@ InterruptRS232TxDone:
     ; The entire string has been transmitted, so disable TXIE.
     ; When the next string is sent TXIE will be enabled again.
 
+    bcf PIE1, TXIE , ACCESS   ; Disable interrupts
 
 
 WaitHere:
@@ -131,7 +132,8 @@ WaitHere:
     btfss TXSTA, TRMT, ACCESS ;   TSR is set when TSR is empty
     goto WaitHere
 
-    bcf TXSTA, TXEN, ACCESS ; Disable transmission.
+    bcf TXSTA, TXEN, ACCESS   ; Disable transmission.
+
 
     clrf RS232_PTRU, ACCESS
     clrf RS232_PTRH, ACCESS
@@ -140,9 +142,8 @@ WaitHere:
     clrf TBLPTRH, ACCESS
     clrf TBLPTRL, ACCESS
     
-    ;bcf PIE1, TXIE, ACCESS  ; Disable interrupt
 
-    ;movlw 0xAB;             ; Writing something noticable to TXREG clears TXIF.
+    ;movlw 0xAB;             ; Writing something noticable 
     ;movwf TXREG,ACCESS      ; 0xAB should not be output.
 
 InterruptServiceEnd:

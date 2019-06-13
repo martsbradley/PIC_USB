@@ -46,7 +46,7 @@ MAIN_PROGRAM code
 XXA:
    da "K"
 ONE:
-    da "Mary\n\r"
+    da "Mary\n\r\0"
 XXB:
    da "K"
 
