@@ -33,7 +33,6 @@ RS232_PTRU          res 1  ; These store the current print head of the RS232 out
 RS232_PTRH          res 1
 RS232_PTRL          res 1
 
-WRITE_THIS          res 1
 
    
 INTERRUPT_CODE  code
@@ -93,21 +92,19 @@ InterruptTransmitRS232Ready:
     movf RS232_PTRL, W
     movwf TBLPTRL, ACCESS
 
-    tblrd*+	
-
+    tblrd*+
 
     movf TABLAT, W, ACCESS    
-    movwf WRITE_THIS
 
     addlw 0x00              ; Check for end of string \0 character
     btfsc STATUS,Z, ACCESS  ; If zero bit is clear, skip the goto
     goto InterruptRS232TxDone
 
-    movf WRITE_THIS, W
     movwf TXREG,ACCESS      ; Send the data
 
     ; Now TABLAT holds the data and the TBLPTR pointer has been incremented
     ; So put the new pointer address into the RS232 registers.
+
 
     movf TBLPTRU, W
     movwf RS232_PTRU, ACCESS
@@ -117,6 +114,7 @@ InterruptTransmitRS232Ready:
 
     movf TBLPTRL, W
     movwf RS232_PTRL, ACCESS
+
 
     goto InterruptServiceEnd
 
@@ -141,11 +139,8 @@ WaitHere:
     clrf TBLPTRU, ACCESS
     clrf TBLPTRH, ACCESS
     clrf TBLPTRL, ACCESS
+
     
-
-    ;movlw 0xAB;             ; Writing something noticable 
-    ;movwf TXREG,ACCESS      ; 0xAB should not be output.
-
 InterruptServiceEnd:
 
     movf TABLAT_TEMP, W   ; restore table pointer registers.
