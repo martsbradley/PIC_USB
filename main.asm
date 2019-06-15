@@ -43,12 +43,14 @@ LAUNCH_PROGRAM code     0x00
 
 MAIN_PROGRAM code
 
+ONE:   ;12345 6 7
+    da "Maryx\n\r"
 XXA:
-   da "K"
-ONE:
-    da "Mary\n\r"
+   da "Kxxxx"
+TWO:
+    da "Michxy\n\r"
 XXB:
-   da "K"
+   da "Z"
 
 Main
     call DelayOneSecond
@@ -71,6 +73,17 @@ HERE:
     movlw high ONE
     movwf SHADOW_RS232_PTRH, ACCESS
     movlw low  ONE
+    movwf SHADOW_RS232_PTRL, ACCESS
+
+    call print
+    call DelayOneSecond
+
+
+    movlw upper TWO
+    movwf SHADOW_RS232_PTRU, ACCESS 
+    movlw high TWO
+    movwf SHADOW_RS232_PTRH, ACCESS
+    movlw low  TWO
     movwf SHADOW_RS232_PTRL, ACCESS
 
     call print

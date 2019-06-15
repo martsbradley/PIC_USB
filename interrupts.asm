@@ -94,6 +94,12 @@ InterruptTransmitRS232Ready:
 
     tblrd*+
 
+
+    ;  This works but has to write an 
+
+;   da "Maryxy\n\r"  -> prints 'Maryxy' followed by new line followed by next byte.
+;   da "Maryx\n\r"   -> prints 'Maryx' followed by new line
+
     movf TABLAT, W, ACCESS    
 
     addlw 0x00              ; Check for end of string \0 character
