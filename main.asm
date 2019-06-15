@@ -62,6 +62,8 @@
     
     
     extern InitUsartComms, print, Delay
+    extern print, InterruptServiceRoutine
+
     
 ;bank0        udata
 mybank1 udata   0x300
@@ -85,67 +87,69 @@ COUNTER_H           res    1
 
 
 
-STARTUP     code        0x0000
+LAUNCH_PROGRAM code     0x00  
     goto        Main                    ; Reset vector
     nop
     nop
-    goto        $                       ; High-priority interrupt vector trap
+    goto        InterruptServiceRoutine  ; Address 0x08 low interrupt vector
     nop
     nop
     nop
     nop
     nop
     nop
-    goto        $                       ; Low-priority interrupt vector trap
+    goto        Main
+
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+MAIN_PROGRAM code
 
 HELLO_WORLD:
-    da "HELLO WORLD\n\r"
+    da "HELLO WORLD\n\r",0
 USB_INITIALISED_DONE_STR:
-    da "USB_init_done\n\r"
+    da "USB_init_done\n\r",0
 POWERED_STATE_STR:
-    da "POWER STATE\n\r"
+    da "POWER STATE\n\r",0
 ADDRESS_STATE_STR:
-    da "ADDRESS STATE\n\r"
+    da "ADDRESS STATE\n\r",0
 DEFAULT_STATE_STR:
-    da "DEFAULT STATE\n\r"
+    da "DEFAULT STATE\n\r",0
 USB_INITIALISED:
-    da "USB_init_called\n\r"
+    da "USB_init_called\n\r",0
 SET_CONFIG:
-    da "SET_CONFIG\n\r"
+    da "SET_CONFIG\n\r",0
 PIC_CONFIGURED:
-    da "PIC_CONFIGURED\n\r"
+    da "PIC_CONFIGURED\n\r",0
 MartyHERE:
-    da "MartyHERE\n\r"
+    da "MartyHERE\n\r",0
 DONE_THAT:
-    da "DONE_THAT\n\r"
-CONFIG_STATE_STR:
-    da "CONFIG_NEVER_PRINT\n\r"
+    da "DONE_THAT\n\r",0
 USB_INITIALISED_RETRY:
-    da "USB_INITIALISED_RETRY\n\r" 
+    da "USB_INITIALISED_RETRY\n\r" ,0
 IDLE_CONDITION:
-    da "IDLE_CONDITION\n\r"
-INTERRUPT_HANDLED:
-    da "Interrupt\n\r"
+    da "IDLE_CONDITION\n\r",0
+SOME_PROBLEM_OR_OTHER:
+    da "UNKNOW\n\r",0
 STALL_HANDSHAKE_STR:
-    da "_istall\n\r"
+    da "Stalled!\n\r",0
 USB_RESET_STR:
-    da "Reset.\n\r"
+    da "Reset.\n\r",0
 TXN_COMPLETE_STR:
-    da "TXN_COMPLETE\n\r"    
+    da "TXN_COMPLETE\n\r"    ,0
 GET_DEVICE_DESCRIPTOR_STR:
-    da "GET_DEVICE_DESCRIPTOR\n\r"
+    da "GET_DEVICE_DESCRIPTOR\n\r",0
 GET_CONFIG_DESCRIPTOR_STR:
-    da "GET_CONFIG_DESCRIPTOR\n\r"
+    da "GET_CONFIG_DESCRIPTOR\n\r",0
 GET_STRING_DESCRIPTOR_STR:
-    da "GET_STRING_DESCRIPTOR\n\r"
+    da "GET_STRING_DESCRIPTOR\n\r",0
 SET_DEVICE_ADDRESS_STR:
-    da "SET_DEVICE_ADDRESS\n\r"
-ProcessInToken_STR:
-    da "ProcessInToken\n\r"
-EP0_GET_DESC:
-    da "EP0_GET_DESC\n\r"
+    da "SET_DEVICE_ADDRESS\n\r",0
+PROCESS_OUT_TOKEN:
+    da "PROCESS_OUT_TOKEN\n\r",0
+PROCESS_IN_TOKEN:
+    da "PROCESS_IN_TOKEN\n\r",0
 EP0_SET_ADDR:
-    da "EP0_SET_ADDR\n\r"
+    da "EP0_SET_ADDR\n\r",0
 
 USBSTUFF    code
 Descriptor
@@ -163,7 +167,7 @@ Descriptor
         endi
     endi
     movwf TBLPTRL, ACCESS
-   tblrd*
+    TBLRD*
     movf TABLAT, W
     return
 
@@ -192,9 +196,9 @@ Configuration1
 
 EndPoint1
     db            0x07, ENDPOINT        ; bLength, bDescriptorType
-    db            0x01, 0x0F            ; bEndpointAddress | Data Synchronous. Interrupt (WRONG maybe!!!!!!)
+    db            0x01, 0x0F            ; bEndpointAddr & Direction OUT Data Synchro Interrupt 
     db            0x01, 0x00            ; one bytes
-    DB            0x0f                  ; 16?? 
+    DB            0x0f                  ; ????
 
 
 
@@ -431,9 +435,11 @@ ServiceUSB
             call        ProcessSetupToken
             break
         case TOKEN_IN
+            ;PrintString PROCESS_IN_TOKEN
             call        ProcessInToken
             break
         case TOKEN_OUT
+            ;PrintString PROCESS_OUT_TOKEN
             call        ProcessOutToken
             break
         ends
@@ -851,7 +857,7 @@ StandardRequests
             endi
             break
         case STRING
-            PrintString GET_STRING_DESCRIPTOR_STR
+            ;PrintString GET_STRING_DESCRIPTOR_STR
             movf USB_buffer_data+wValue, W, BANKED
             select
             case 0
@@ -1039,7 +1045,6 @@ VendorRequests
 
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ProcessInToken
-    ;PrintString ProcessInToken_STR
     banksel USB_USTAT
     movf  USB_USTAT, W, BANKED
     andlw 0x18        ; extract the EP bits
@@ -1186,6 +1191,12 @@ Main
     clrf        TRISA,  ACCESS    ; Set up all PORTA pins to be digital outputs.
     
     call	InitUsartComms
+
+    bcf    RCON, IPEN,   ACCESS          ; Disable priority levels on interrupts.
+    bsf    INTCON, GIE,  ACCESS          ; Enable all unmasked interrupts.
+    bsf    INTCON, PEIE, ACCESS          ; Enables all unmasked peripheral interrupts.
+    bcf    PIE1, TXIE ,  ACCESS          ; Disable transmission interrupts.
+
     PrintString HELLO_WORLD
     
     call        InitUSB           ; Initialize the USB registers and serial interface engine.

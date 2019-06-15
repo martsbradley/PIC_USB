@@ -1,60 +1,71 @@
-#include <p18f2550.inc>
-#include util_macros.inc
-     global print, InitUsartComms, RS232_SendByte
+    #include p18f2550.inc
+    #include util_macros.inc
+    global print, InitUsartComms, 
+    extern RS232_PTRU
+    extern RS232_PTRH
+    extern RS232_PTRL
+
+    extern SHADOW_RS232_PTRU
+    extern SHADOW_RS232_PTRH
+    extern SHADOW_RS232_PTRL
 
 
-BANK0 udata
-printchar_hi  res 1     ; string being printed.
-printchar_lo  res 1
-PrintCounter1 res 1
- 
-PROG  code
+; To make this RS232 transmission interrupt driven
+; create three bytes that hold the upper middle and 
+; lower portions of address of the string to be printed.
+; 
+; The table registers are adjusted by the handler 
+; so these will need saved and restored by the 
+; interrupt handler.
 
- 
-    
-lookupX:
-    TBLRD*+	
-    movf TABLAT, W, ACCESS    
-    return
-   
-    
+;         TBLPTRU TBLPTRH TBLPTRL
+;
+; Ensure that the PIR1,TXIF is 1 so ready to send.
+; Update the three registers with the address of the
+;
+; The upper/high/low address of the string will be stored 
+; to three rs232 registers RS232PTRU RS232PTRH RS232PTRL
+;
+; InterruptHandler:
+;    Populate the TBLPTR registers from RS232PTR U/H/L
+;    Lookup table to get the byte for W
+;    Write out the data from W.
+;    copy the latest TBLPTR registers to the RS232PTR U/H/L
+;    Check for zero, clear interrupt flag.
+;    Copy the byte to TXREG  
+;
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+RS232_CODE  code
+
 print:
-    call lookupX             ; get a byte (this is the magic)
-    addlw 0x00              ; Check for end of string \0 character
-    btfsc STATUS,Z, ACCESS
-    return                  ;\0 hit - return from print subroutine.
-    call RS232_SendByte
-    goto print              ; do it again
-    
-    
-printNewLine:
-    movlw 0x0D   ; CR
-    call RS232_SendByte
-    movlw 0x0A   ; LF
-    call RS232_SendByte
-    return
-    
-    
-; Print the decimal digits without the leading zeros
-; Initialise counter to process first seven digits.
-
-RS232_SendByte:
-    btfss   PIR1,TXIF ,ACCESS      ; If TXIF = 1 ready to send another char
-    goto    RS232_SendByte
-    movwf   TXREG,ACCESS
+    btfsc PIE1, TXIE , ACCESS   ; skip next if TXIE == 1 skip prints if tx is busy
     return
 
-InitUsartComms:                        ; Setup the usart hardware
+    movf SHADOW_RS232_PTRU, W  
+    movwf RS232_PTRU           
+                               
+    movf SHADOW_RS232_PTRH, W  
+    movwf RS232_PTRH
+
+    movf SHADOW_RS232_PTRL, W
+    movwf RS232_PTRL
+
+    bsf TXSTA, TXEN, ACCESS  ; Enable transmission, causes an interrupt.
+    bsf PIE1, TXIE , ACCESS  ; Enable interrupts
+    return
+    
+InitUsartComms:                 ; Setup the usart hardware
     bsf   TRISC, 7, ACCESS
     bsf   TRISC, 6, ACCESS
     banksel TXSTA
-    movlw 0x19            ; BAUD 9600 & FOSC 4000000L
+    movlw 0x19                  ; BAUD 9600 & FOSC 4000000L
     movwf SPBRG,ACCESS          ; 8 bit communication rather than 9bit
-    movlw 0x24
-    movwf TXSTA,ACCESS
+    movlw 0x04                  ; TXEN = 0
+    movwf TXSTA,ACCESS          ; Asynchronous, TXEN
     banksel RCSTA
-    movlw 0x90            ; DIVIDER ((int)(FOSC/(16UL * BAUD) -1))
+    movlw 0x90                  ; DIVIDER ((int)(FOSC/(16UL * BAUD) -1))
     movwf RCSTA,ACCESS          ; HIGH_SPEED 1
     return
 
-    END                     ;Stop assembling here
+    END                         ;Stop assembling here
