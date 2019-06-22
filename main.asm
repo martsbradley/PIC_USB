@@ -525,11 +525,10 @@ StandardRequests
         andlw 0x1F                    ; extract request recipient bits
         select
         case RECIPIENT_DEVICE
-            call addressControlTxBuffer
-            banksel USB_device_status
-            ; copy device status byte to EP0 buffer
+            call pointToCtrlEPInputBuffer
+            banksel USB_device_status               
             movf    USB_device_status, W, BANKED 
-            movwf   POSTINC0
+            movwf   POSTINC0                   ; copy device status byte to EP0 buffer
             clrf    INDF0
             banksel BD0IBC
             call updateControlTxTwoBytes
@@ -547,7 +546,7 @@ StandardRequests
                 ; interface should return two bytes of value 0x00.
 
                 ifl USB_BufferData+wIndex, LT, NUM_INTERFACES
-                    call addressControlTxBuffer
+                    call pointToCtrlEPInputBuffer
                     clrf POSTINC0         ;  It is only clearing the two bytes of data. 
                     clrf INDF0            ;  See comment 9 lines above.
                     call updateControlTxTwoBytes
@@ -566,11 +565,11 @@ StandardRequests
                 movf USB_BufferData+wIndex, W, BANKED ; Get EP
                 andlw 0x0F                             ; Strip off direction bit
                 ifset STATUS, Z, ACCESS                ; see if it is EP0
-                    call addressControlTxBuffer
+                    call pointToCtrlEPInputBuffer
                     banksel USB_BufferData+wIndex
-                                                       ; If the specified direction is IN...
-                    ifset USB_BufferData+wIndex, 7, BANKED        
-                        banksel  BD0IST
+                                                       
+                    ifset USB_BufferData+wIndex, 7, BANKED ; If the specified direction is IN
+                        banksel  BD0IST                  
                         movf     BD0IST, W, BANKED
                     otherwise
                         banksel  BD0OST
@@ -588,7 +587,7 @@ StandardRequests
                 break
             case CONFIG_STATE
 
-                call addressControlTxBuffer
+                call pointToCtrlEPInputBuffer
 
                 movlw   high UEP0                   ; put UEP0 address...
                 movwf   FSR1H, ACCESS
@@ -849,7 +848,7 @@ StandardRequests
 
     ; >>>>  STANDARD REQUESTS  <<<< ;
     case GET_CONFIGURATION
-        call addressControlTxBuffer
+        call pointToCtrlEPInputBuffer
         banksel     USB_curr_config
         movf        USB_curr_config, W, BANKED
         movwf       INDF0                    ; copy current device configuration to EP0 IN buffer
@@ -897,7 +896,7 @@ StandardRequests
         select
         case CONFIG_STATE
             ifl USB_BufferData+wIndex, LT, NUM_INTERFACES
-                call addressControlTxBuffer
+                call pointToCtrlEPInputBuffer
                 clrf     INDF0                    ; always send back 0 for bAlternateSetting
                 movlw    0x01
                 movwf    BD0IBC, BANKED            ; set byte count to 1
@@ -1049,7 +1048,7 @@ SendDescriptorPacket
     banksel    USB_bytes_left
     ifl USB_bytes_left, LT, MAX_PACKET_SIZE
         movlw  NO_REQUEST
-        movwf  USB_dev_req, BANKED        ; sending a short packet, so clear device request
+        movwf  USB_dev_req, BANKED    ; sending a short packet, so clear device request
         movf   USB_bytes_left, W, BANKED
     otherwise
         movlw  MAX_PACKET_SIZE
@@ -1058,19 +1057,17 @@ SendDescriptorPacket
     movwf    USB_packet_length, BANKED
     banksel  BD0IBC
     movwf    BD0IBC, BANKED           ; set EP0 IN byte count with packet size
-    movf     BD0IAH, W, BANKED        ; put EP0 IN buffer pointer...
-    movwf    FSR0H, ACCESS
-    movf     BD0IAL, W, BANKED
-    movwf    FSR0L, ACCESS            ; ...into FSR0
+    call pointToCtrlEPInputBuffer
+
     banksel  USB_loop_index
     forlf USB_loop_index, 1, USB_packet_length
-        call  getDescriptorByte            ; get next byte of descriptor being sent
-        movwf POSTINC0            ; copy to EP0 IN buffer, and increment FSR0
-        incf  USB_desc_ptr, F, BANKED    ; increment the descriptor pointer
+        call  getDescriptorByte       ; get next byte of descriptor being sent
+        movwf POSTINC0                ; copy to EP0 IN buffer, and increment FSR0
+        incf  USB_desc_ptr, F, BANKED ; increment the descriptor pointer
         next USB_loop_index
     banksel   BD0IST
     movlw     0x40
-    xorwf     BD0IST, W, BANKED        ; toggle the DATA01 bit
+    xorwf     BD0IST, W, BANKED       ; toggle the DATA01 bit
     andlw     0x40                    ; clear the PIDs bits
     iorlw     0x88                    ; set UOWN and DTS bits
     movwf     BD0IST, BANKED
@@ -1092,7 +1089,7 @@ updateControlTxZeroBytes:
     movwf   BD0IST, BANKED ; Send packet as DATA1, set UOWN bit    
     return
 
-addressControlTxBuffer:
+pointToCtrlEPInputBuffer:
     banksel  BD0IAH
     movf     BD0IAH, W, BANKED              ;DUPLICATE
     movwf    FSR0H, ACCESS
