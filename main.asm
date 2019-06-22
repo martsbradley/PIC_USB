@@ -566,11 +566,7 @@ StandardRequests
                 movf USB_BufferData+wIndex, W, BANKED ; Get EP
                 andlw 0x0F                             ; Strip off direction bit
                 ifset STATUS, Z, ACCESS                ; see if it is EP0
-                    banksel BD0IAH
-                    movf    BD0IAH, W, BANKED          ; put EP0 IN buffer pointer...
-                    movwf   FSR0H, ACCESS
-                    movf    BD0IAL, W, BANKED
-                    movwf   FSR0L, ACCESS              ; ...into FSR0
+                    call addressControlTxBuffer
                     banksel USB_BufferData+wIndex
                                                        ; If the specified direction is IN...
                     ifset USB_BufferData+wIndex, 7, BANKED        
@@ -592,11 +588,7 @@ StandardRequests
                 break
             case CONFIG_STATE
 
-                banksel BD0IAH
-                movf    BD0IAH, W, BANKED           ; put EP0 IN buffer pointer...
-                movwf   FSR0H, ACCESS
-                movf    BD0IAL, W, BANKED
-                movwf   FSR0L, ACCESS               ; ...into FSR0
+                call addressControlTxBuffer
 
                 movlw   high UEP0                   ; put UEP0 address...
                 movwf   FSR1H, ACCESS
@@ -857,11 +849,7 @@ StandardRequests
 
     ; >>>>  STANDARD REQUESTS  <<<< ;
     case GET_CONFIGURATION
-        banksel     BD0IAH
-        movf        BD0IAH, W, BANKED
-        movwf       FSR0H, ACCESS
-        movf        BD0IAL, W, BANKED
-        movwf       FSR0L, ACCESS
+        call addressControlTxBuffer
         banksel     USB_curr_config
         movf        USB_curr_config, W, BANKED
         movwf       INDF0                    ; copy current device configuration to EP0 IN buffer
