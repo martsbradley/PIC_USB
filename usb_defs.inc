@@ -172,10 +172,10 @@
 
 ; standard descriptor types
 #define    DEVICE        1
-#define    CONFIGURATION    2
+#define    CONFIGURATION 2
 #define    STRING        3
-#define    INTERFACE    4
-#define    ENDPOINT    5
+#define    INTERFACE     4
+#define    ENDPOINT      5
 
 ; HID class descriptor types
 #define HID            0x21

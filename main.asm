@@ -103,6 +103,8 @@ LAUNCH_PROGRAM code     0x00
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 MAIN_PROGRAM code
+OUTTOK:
+    da "OUTK\n\r",0
 
 HELLO_WORLD:
     da "HELLO WORLD\n\r",0
@@ -170,32 +172,34 @@ getDescriptorByte
 
 Descriptor_begin
 Device
-    db            0x12, DEVICE          ; bLength, bDescriptorType
-    db            0x10, 0x01            ; bcdUSB (low byte), bcdUSB (high byte)
-    db            0x00, 0x00            ; bDeviceClass, bDeviceSubClass
-    db            0x00, MAX_PACKET_SIZE ; bDeviceProtocol, bMaxPacketSize
-    db            0xD8, 0x04            ; idVendor (low byte), idVendor (high byte)
-    db            0x14, 0x00            ; idProduct (low byte), idProduct (high byte)
-    db            0x00, 0x00            ; bcdDevice (low byte), bcdDevice (high byte)
-    db            0x01, 0x02            ; iManufacturer, iProduct
-    db            0x00, NUM_CONFIGURATIONS    ; iSerialNumber (none), bNumConfigurations
+    db            0x12, DEVICE             ; bLength, bDescriptorType
+    db            0x10, 0x01               ; bcdUSB (low byte), bcdUSB (high byte)
+    db            0x00, 0x00               ; bDeviceClass, bDeviceSubClass
+    db            0x00, MAX_PACKET_SIZE    ; bDeviceProtocol, bMaxPacketSize
+    db            0xD8, 0x04               ; idVendor (low byte), idVendor (high byte)
+    db            0x14, 0x00               ; idProduct (low byte), idProduct (high byte)
+    db            0x00, 0x00               ; bcdDevice (low byte), bcdDevice (high byte)
+    db            0x01, 0x02               ; iManufacturer, iProduct (String idx)
+    db            0x00, NUM_CONFIGURATIONS ; iSerialNumber (none), bNumConfigurations
 
 Configuration1
-    db            0x09, CONFIGURATION    ; bLength, bDescriptorType
+    db            0x09, CONFIGURATION   ; bLength, bDescriptorType
     db            0x19, 0x00            ; wTotalLength (low byte), wTotalLength (high byte)
-    db            NUM_INTERFACES, 0x01    ; bNumInterfaces, bConfigurationValue
-    db            0x03, 0xA0            ; iConfiguration (none), bmAttributes
+    db            NUM_INTERFACES, 0x01  ; bNumInterfaces, bConfigurationValue
+    db            0x03, 0xA0            ; iConfiguration String idx , bmAttributes
     db            0x32, 0x09            ; bMaxPower (100 mA), bLength (Interface1 descriptor starts here)
-    db            INTERFACE, 0x00        ; bDescriptorType, bInterfaceNumber
+
+Interface1
+    db            INTERFACE, 0x00       ; bDescriptorType, bInterfaceNumber
     db            0x00, 0x01            ; bAlternateSetting, bNumEndpoints (excluding EP0)
     db            0xFF, 0x00            ; bInterfaceClass (vendor specific class code), bInterfaceSubClass
-    db            0xFF, 0x00            ; bInterfaceProtocol (vendor specific protocol used), iInterface (none)
+    db            0xFF, 0x04            ; bInterfaceProtocol (vendor specific protocol used), iInterface (none)
 
 EndPoint1
     db            0x07, ENDPOINT        ; bLength, bDescriptorType
     db            0x01, 0x0F            ; bEndpointAddr & Direction OUT Data Synchro Interrupt 
     db            0x01, 0x00            ; one bytes
-    DB            0x0f                  ; ????
+    db            0x0f                  ; ????
 
 
 
@@ -268,7 +272,7 @@ String2
     db            'r', 0x00
     db            'e', 0x00
 String3
-    db            Descriptor_end-String3, STRING
+    db            String4-String3, STRING
     db            'M', 0x00
     db            'y', 0x00
     db            ' ', 0x00
@@ -278,6 +282,16 @@ String3
     db            'f', 0x00
     db            'i', 0x00
     db            'g', 0x00
+String4
+    db            Descriptor_end-String4, STRING
+    db            'D', 0x00
+    db            'M', 0x00
+    db            'Z', 0x00
+    db            ' ', 0x00
+    db            'I', 0x00
+    db            't', 0x00
+    db            'r', 0x00
+    db            'f', 0x00
 Descriptor_end
 
 
@@ -491,7 +505,7 @@ ProcessSetupToken
                                   ; token and packet processing enabled.
     banksel USB_dev_req
     movlw   NO_REQUEST
-    movwf   USB_dev_req, BANKED         ; clear the device request in process
+    movwf   USB_dev_req, BANKED   ; clear the device request in process
 
     movf    USB_BufferData+bmRequestType, W, BANKED
                   ; The bmRequestType is the first 8 bits of the Request data.
@@ -829,6 +843,9 @@ StandardRequests
 	    case 3
                 movlw low (String3-Descriptor_begin)
                 break		
+            case 4
+                movlw low (String4-Descriptor_begin)
+                break		
             default
                 bsf USB_error_flags, 0, BANKED    ; Set Request Error flag
             ends
@@ -1018,6 +1035,7 @@ ProcessOutToken
     banksel  USB_USTAT
     movf     USB_USTAT, W, BANKED
     andlw    0x18        ; extract the EP bits
+    PrintString OUTTOK
     select
     case EP0
 	banksel BD0OBC
