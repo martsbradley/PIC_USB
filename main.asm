@@ -341,22 +341,10 @@ ServiceUSB
         bcf     UIR, TRNIF, ACCESS
         bcf     UIR, TRNIF, ACCESS
         bcf     UIR, TRNIF, ACCESS
+
         clrf    UEP0, ACCESS          ; clear all EP control registers 
-        clrf    UEP1, ACCESS          ; to disable all endpoints.
-        clrf    UEP2, ACCESS
-        clrf    UEP3, ACCESS
-        clrf    UEP4, ACCESS
-        clrf    UEP5, ACCESS
-        clrf    UEP6, ACCESS
-        clrf    UEP7, ACCESS
-        clrf    UEP8, ACCESS
-        clrf    UEP9, ACCESS
-        clrf    UEP10, ACCESS
-        clrf    UEP11, ACCESS
-        clrf    UEP12, ACCESS
-        clrf    UEP13, ACCESS
-        clrf    UEP14, ACCESS
-        clrf    UEP15, ACCESS
+        call clearNonControlEndPoints
+
         banksel BD0OBC
         movlw   MAX_PACKET_SIZE       ; 8 bytes lowest packet size for low and high speed.
         movwf   BD0OBC, BANKED
@@ -537,21 +525,14 @@ StandardRequests
         andlw 0x1F                    ; extract request recipient bits
         select
         case RECIPIENT_DEVICE
-            banksel BD0IAH                                                                ; DUPLICATE
-            movf    BD0IAH, W, BANKED
-            movwf   FSR0H, ACCESS
-            movf    BD0IAL, W, BANKED  ; get buffer pointer
-            movwf   FSR0L, ACCESS
+            call addressControlTxBuffer
             banksel USB_device_status
             ; copy device status byte to EP0 buffer
             movf    USB_device_status, W, BANKED 
             movwf   POSTINC0
             clrf    INDF0
             banksel BD0IBC
-            movlw   0x02
-            movwf   BD0IBC, BANKED ; Setting byte count to 2
-            movlw   0xC8
-            movwf   BD0IST, BANKED ; Send packet as DATA1, set UOWN bit    
+            call updateControlTxTwoBytes
             break
 
         case RECIPIENT_INTERFACE 
@@ -562,20 +543,14 @@ StandardRequests
                 bsf USB_error_flags, 0, BANKED
                 break
             case CONFIG_STATE
-                ; Used to return the status of the interface. Such a request to the interface should return 
-                ; two bytes of value 0x00.
+                ; Used to return the status of the interface. Such a request to the 
+                ; interface should return two bytes of value 0x00.
+
                 ifl USB_BufferData+wIndex, LT, NUM_INTERFACES
-                    banksel BD0IAH                                                                ; DUPLICATE
-                    movf    BD0IAH, W, BANKED
-                    movwf   FSR0H, ACCESS
-                    movf    BD0IAL, W, BANKED    ; Get buffer pointer
-                    movwf   FSR0L, ACCESS
-                    clrf    POSTINC0                                ;  It is only clearing the two bytes of data. 
-                    clrf    INDF0                                   ;  See comment 9 lines above.
-                    movlw   0x02
-                    movwf   BD0IBC, BANKED       ; Set byte count to 2
-                    movlw   0xC8
-                    movwf   BD0IST, BANKED       ; Send packet as DATA1, set UOWN bit                                                                                                
+                    call addressControlTxBuffer
+                    clrf POSTINC0         ;  It is only clearing the two bytes of data. 
+                    clrf INDF0            ;  See comment 9 lines above.
+                    call updateControlTxTwoBytes
                 otherwise
                     ; Host queried state of unknown interface.
                     bsf USB_error_flags, 0, BANKED ; Set Request Error flag
@@ -610,10 +585,7 @@ StandardRequests
                     rrncf INDF0, F
                     rrncf INDF0, F        ; shift BSTALL bit into the lsb position
                     clrf  PREINC0
-                    movlw 0x02
-                    movwf BD0IBC, BANKED  ; set byte count to 2
-                    movlw 0xC8
-                    movwf BD0IST, BANKED  ; send packet as DATA1, set UOWN bit
+                    call updateControlTxTwoBytes
                 otherwise
                     bsf   USB_error_flags, 0, BANKED        ; set Request Error flag
                 endi
@@ -685,10 +657,7 @@ StandardRequests
                     rrncf    INDF0, F                   ; shift BSTALL bit into the lsb position
                     clrf     PREINC0                                        
                     banksel  BD0IBC
-                    movlw    0x02
-                    movwf    BD0IBC, BANKED             ; set byte count to 2
-                    movlw    0xC8
-                    movwf    BD0IST, BANKED             ; send packet as DATA1, set UOWN bit
+                    call updateControlTxTwoBytes
                 endi
                 break
             default
@@ -716,10 +685,7 @@ StandardRequests
                 otherwise
                     bsf  USB_device_status, 1, BANKED
                 endi
-                banksel BD0IBC
-                clrf    BD0IBC, BANKED                    ; set byte count to 0
-                movlw   0xC8
-                movwf   BD0IST, BANKED                    ; send packet as DATA1, set UOWN bit
+                call updateControlTxZeroBytes
                 break
             default
                 bsf   USB_error_flags, 0, BANKED        ; set Request Error flag
@@ -733,10 +699,7 @@ StandardRequests
                 movf  USB_BufferData+wIndex, W, BANKED    ; get EP
                 andlw 0x0F                                 ; strip off direction bit
                 ifset STATUS, Z, ACCESS                    ; see if it is EP0
-                    banksel BD0IBC
-                    clrf    BD0IBC, BANKED                 ; set byte count to 0
-                    movlw   0xC8
-                    movwf   BD0IST, BANKED                 ; send packet as DATA1, set UOWN bit
+                    call updateControlTxZeroBytes
                 otherwise
                     bsf USB_error_flags, 0, BANKED         ; set Request Error flag
                 endi
@@ -797,10 +760,7 @@ StandardRequests
                     endi
                 endi
                 ifclr USB_error_flags, 0, BANKED    ; if there was no Request Error...
-                    banksel BD0IBC
-                    clrf    BD0IBC, BANKED          ; set byte count to 0
-                    movlw   0xC8
-                    movwf   BD0IST, BANKED          ; send packet as DATA1, set UOWN bit
+                    call updateControlTxZeroBytes
                 endi
                 break
             default
@@ -822,10 +782,7 @@ StandardRequests
             movwf   USB_dev_req, BANKED           ; processing a set address request
             movf    USB_BufferData+wValue, W, BANKED
             movwf   USB_address_pending, BANKED   ; save new address
-            banksel BD0IBC
-            clrf    BD0IBC, BANKED                ; set byte count to 0
-            movlw   0xC8
-            movwf   BD0IST, BANKED                ; send packet as DATA1, set UOWN bit
+            call updateControlTxZeroBytes
         endi
     break
 
@@ -919,21 +876,7 @@ StandardRequests
     case SET_CONFIGURATION
         ;PrintString SET_CONFIG
         ifl USB_BufferData+wValue, LE, NUM_CONFIGURATIONS
-            clrf  UEP1, ACCESS        ; clear all EP control registers except for EP0 to disable EP1-EP15 prior to setting configuration
-            clrf  UEP2, ACCESS
-            clrf  UEP3, ACCESS
-            clrf  UEP4, ACCESS
-            clrf  UEP5, ACCESS
-            clrf  UEP6, ACCESS
-            clrf  UEP7, ACCESS
-            clrf  UEP8, ACCESS
-            clrf  UEP9, ACCESS
-            clrf  UEP10, ACCESS
-            clrf  UEP11, ACCESS
-            clrf  UEP12, ACCESS
-            clrf  UEP13, ACCESS
-            clrf  UEP14, ACCESS
-            clrf  UEP15, ACCESS
+            call clearNonControlEndPoints
             movf  USB_BufferData+wValue, W, BANKED
             movwf USB_curr_config, BANKED
             select
@@ -955,10 +898,7 @@ StandardRequests
                 bsf    PORTB, 3, ACCESS
 #endif
             ends
-            banksel BD0IBC
-            clrf    BD0IBC, BANKED            ; set byte count to 0
-            movlw   0xC8
-            movwf   BD0IST, BANKED            ; send packet as DATA1, set UOWN bit
+            call updateControlTxZeroBytes
         otherwise
             bsf     USB_error_flags, 0, BANKED    ; set Request Error flag
         endi
@@ -969,11 +909,7 @@ StandardRequests
         select
         case CONFIG_STATE
             ifl USB_BufferData+wIndex, LT, NUM_INTERFACES
-                banksel  BD0IAH
-                movf     BD0IAH, W, BANKED              ;DUPLICATE
-                movwf    FSR0H, ACCESS
-                movf     BD0IAL, W, BANKED        ; get buffer pointer
-                movwf    FSR0L, ACCESS
+                call addressControlTxBuffer
                 clrf     INDF0                    ; always send back 0 for bAlternateSetting
                 movlw    0x01
                 movwf    BD0IBC, BANKED            ; set byte count to 1
@@ -996,10 +932,7 @@ StandardRequests
                 movf  USB_BufferData+wValue, W, BANKED
                 select
                 case 0                                    ; currently support only bAlternateSetting of 0
-                    banksel BD0IBC
-                    clrf    BD0IBC, BANKED            ; set byte count to 0
-                    movlw   0xC8
-                    movwf   BD0IST, BANKED            ; send packet as DATA1, set UOWN bit
+                    call updateControlTxZeroBytes
                     break
                 default
                     bsf     USB_error_flags, 0, BANKED    ; set Request Error flag
@@ -1035,17 +968,12 @@ VendorRequests
     select
     case SET_RA0
         bsf         PORTA, 0, ACCESS        ; set RA0 high
-        banksel     BD0IBC
-        clrf        BD0IBC, BANKED          ; set byte count to 0
-        movlw       0xC8
-        movwf       BD0IST, BANKED          ; send packet as DATA1, set UOWN bit
+        call updateControlTxZeroBytes
         break
     case CLR_RA0
         bcf         PORTA, 0, ACCESS        ; set RA0 low
-        banksel     BD0IBC
-        clrf        BD0IBC, BANKED          ; set byte count to 0
-        movlw       0xC8
-        movwf       BD0IST, BANKED          ; send packet as DATA1, set UOWN bit
+        call updateControlTxZeroBytes
+
         break
     default
         bsf         USB_error_flags, 0, BANKED    ; set Request Error flag
@@ -1110,9 +1038,7 @@ ProcessOutToken
 	movwf   BD0OBC, BANKED
 	movlw   0x88
 	movwf   BD0OST, BANKED
-	clrf    BD0IBC, BANKED        ; set byte count to 0
-	movlw   0xC8
-	movwf   BD0IST, BANKED        ; send packet as DATA1, set UOWN bit
+        call updateControlTxZeroBytes
 	break
     case EP1
 	break
@@ -1161,8 +1087,51 @@ SendDescriptorPacket
     iorlw     0x88                    ; set UOWN and DTS bits
     movwf     BD0IST, BANKED
     return
+
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-;APPLICATION    code
+updateControlTxTwoBytes:
+    movlw   0x02
+    movwf   BD0IBC, BANKED ; Setting byte count as 2 bytes
+    movlw   0xC8
+    movwf   BD0IST, BANKED ; Send packet as DATA1, set UOWN bit    
+    return
+
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+updateControlTxZeroBytes:
+    banksel BD0IBC
+    clrf    BD0IBC, BANKED                    ; set byte count to 0
+    movlw   0xC8
+    movwf   BD0IST, BANKED ; Send packet as DATA1, set UOWN bit    
+    return
+
+addressControlTxBuffer:
+    banksel  BD0IAH
+    movf     BD0IAH, W, BANKED              ;DUPLICATE
+    movwf    FSR0H, ACCESS
+    movf     BD0IAL, W, BANKED        ; get buffer pointer
+    movwf    FSR0L, ACCESS
+    return 
+
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+clearNonControlEndPoints:
+    clrf    UEP1, ACCESS          ; to disable all endpoints.
+    clrf    UEP2, ACCESS
+    clrf    UEP3, ACCESS
+    clrf    UEP4, ACCESS
+    clrf    UEP5, ACCESS
+    clrf    UEP6, ACCESS
+    clrf    UEP7, ACCESS
+    clrf    UEP8, ACCESS  
+    clrf    UEP9, ACCESS
+    clrf    UEP10, ACCESS
+    clrf    UEP11, ACCESS
+    clrf    UEP12, ACCESS
+    clrf    UEP13, ACCESS
+    clrf    UEP14, ACCESS
+    clrf    UEP15, ACCESS
+    return
+
 InitUSB
     PrintString USB_INITIALISED
     clrf        UIE, ACCESS                ; USB Interrupt Enable register - Mask all USB interrupts
