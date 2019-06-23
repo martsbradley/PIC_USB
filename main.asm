@@ -116,8 +116,10 @@ DEFAULT_STATE_STR:
     da "DEF ST\n\r",0
 USB_INITIALISED:
     da "USB_init_called\n\r",0
-SET_CONFIG:
+SET_CONFIG_STR:
     da "S_CFG\n\r",0
+SET_CONFIG_ERR_STR:
+    da "S_CFG_E\n\r",0
 PIC_CONFIGURED:
     da "CFGED\n\r",0
 USB_INITIALISED_RETRY:
@@ -128,8 +130,6 @@ STALL_HANDSHAKE_STR:
     da "STLL\n\r",0
 USB_RESET_STR:
     da "RST\n\r",0
-GET__DESCRIPTOR_STR:
-    da "G_DES\n\r",0
 REQ_DEVICE_DESCRIPTOR_STR:
     da "REQ_D\n\r",0
 GET_DEVICE_DESCRIPTOR_STR:
@@ -193,17 +193,13 @@ Interface1
     db            INTERFACE, 0x00       ; bDescriptorType, bInterfaceNumber
     db            0x00, 0x01            ; bAlternateSetting, bNumEndpoints (excluding EP0)
     db            0xFF, 0x00            ; bInterfaceClass (vendor specific class code), bInterfaceSubClass
-    db            0xFF, 0x04            ; bInterfaceProtocol (vendor specific protocol used), iInterface (none)
+    db            0xFF, 0x04            ; bInterfaceProtocol (vendor specific), iInterface String idx
 
 EndPoint1
     db            0x07, ENDPOINT        ; bLength, bDescriptorType
-    db            0x01, 0x0F            ; bEndpointAddr & Direction OUT Data Synchro Interrupt 
-    db            0x01, 0x00            ; one bytes
-    db            0x0f                  ; ????
-
-
-
-
+    db            0x01, 0x0F            ; bEndpointAddr & Direction OUT Data Synchronous Interrupt  
+    db            0x04, 0x00            ; four bytes
+    db            0x04                  ; Interval...?
 
 String0
     db            String1-String0, STRING    ; bLength, bDescriptorType
@@ -439,7 +435,7 @@ ServiceUSB
             call        ProcessInToken
             break
         case TOKEN_OUT
-            PrintString PROCESS_OUT_TOKEN
+            ;PrintString PROCESS_OUT_TOKEN
             call        ProcessOutToken
             break
         ends
@@ -878,7 +874,7 @@ StandardRequests
 
     ; >>>>  STANDARD REQUESTS  <<<< ;
     case SET_CONFIGURATION
-        ;PrintString SET_CONFIG
+        PrintString SET_CONFIG_STR
         ifl USB_BufferData+wValue, LE, NUM_CONFIGURATIONS
             call clearNonControlEndPoints
             movf  USB_BufferData+wValue, W, BANKED
@@ -904,6 +900,7 @@ StandardRequests
             ends
             call updateControlTxZeroBytes
         otherwise
+            PrintString SET_CONFIG_ERR_STR
             bsf     USB_error_flags, 0, BANKED    ; set Request Error flag
         endi
         break
@@ -1018,7 +1015,6 @@ ProcessInToken
             ends
             break
         case GET_DESCRIPTOR
-            PrintString GET__DESCRIPTOR_STR
             call SendDescriptorPacket
             break
         ends
