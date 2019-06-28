@@ -64,3 +64,8 @@ the IN TOKEN from the host will mean that the descriptor is send.
 
 The next frame the device needs to respond from ProcessInToken with the requested data.
 lsusb -v -d 04d8:0014
+
+
+
+wireshark filter ' usb.device_address == 46'  the 46 might increment each time the dev is 
+unplugged, number comes from the fourth column of 'lsusb'

@@ -13,7 +13,7 @@
 ;                  Changed over from the deprecated __CONFIG assembler directive 
 ;                  to config for setting the configuration bits.  Eliminated the
 ;                  initial for loop from the start of the main section.
-;     06/22/2005 - Added code to disable all endpoints on USRTIF and to mask
+;     06/22/2005 - Added code to disable all endpoints on URSTIF and to mask
 ;                  bits 0, 1, and 7 of USTAT on TRNIF in serviceUSB.
 ;     04/21/2005 - Initial public release.
 ;
@@ -83,10 +83,6 @@ USB_USWSTAT         res    1 ; Current state POWERED_STATE|DEFAULT_STATE|ADDRESS
 COUNTER_L           res    1
 COUNTER_H           res    1
 
-
-
-
-
 LAUNCH_PROGRAM code     0x00  
     goto        Main                    ; Reset vector
     nop
@@ -104,51 +100,60 @@ LAUNCH_PROGRAM code     0x00
 
 MAIN_PROGRAM code
 OUTTOK:
-    da "OUTK\n\r",0
-
-HELLO_WORLD:
-    da "HELLO WORLD\n\r",0
-POWERED_STATE_STR:
-    da "PWR ST\n\r",0
-ADDRESS_STATE_STR:
-    da "ADDR ST\n\r",0
-DEFAULT_STATE_STR:
-    da "DEF ST\n\r",0
-USB_INITIALISED:
-    da "USB_init_called\n\r",0
+    da "OUTK\r\n",0
+PROCESS_ERR
+    da "er\r\n",0
+PROCESS_T
+    da "t",0
+PROCESS_SETUP_TOKEN_STR:
+    da "s",0
+PROCESS_OUT_TOKEN_STR:
+    da "x",0
+PROCESS_IN_TOKEN_STR:
+    da "i",0
+EP1InStr:
+    da "Z",0
+EP1OutStr:
+    da "T",0
+EP0InStr:
+    da "z",0
 SET_CONFIG_STR:
-    da "S_CFG\n\r",0
+    da "q",0
+HELLO_WORLD:
+    da "Hi\r\n",0
+POWERED_STATE_STR:
+    da "Pwd\r\n",0
+ADDRESS_STATE_STR:
+    da "ADDR\r\n",0
+DEFAULT_STATE_STR:
+    da "DEFS\r\n",0
+USB_INITIALISED:
+    da "USB_init_called\r\n",0
 SET_CONFIG_ERR_STR:
-    da "S_CFG_E\n\r",0
+    da "e",0
 PIC_CONFIGURED:
-    da "CFGED\n\r",0
-USB_INITIALISED_RETRY:
-    da "INIT_RTY\n\r" ,0
+    da "CFGED\r\n",0
 IDLE_CONDITION:
-    da "IDLCOND\n\r",0
+    da "IDL\r\n",0
 STALL_HANDSHAKE_STR:
-    da "STLL\n\r",0
+    da "STLL\r\n",0
 USB_RESET_STR:
-    da "RST\n\r",0
+    da "RST\r\n",0
 REQ_DEVICE_DESCRIPTOR_STR:
-    da "REQ_D\n\r",0
+    da "REQ_D\r\n",0
 GET_DEVICE_DESCRIPTOR_STR:
-    da "G_DEV_DES\n\r",0
+    da "G_DEV_DES\r\n",0
 GET_CONFIG_DESCRIPTOR_STR:
-    da "G_CFG_DES\n\r",0
+    da "G_CFG_DES\r\n",0
 GET_STRING_DESCRIPTOR_STR:
-    da "G_STR_DES\n\r",0
+    da "G_STR_DES\r\n",0
 SET_DEVICE_ADDRESS_STR:
-    da "S_DEV_ADDR\n\r",0
-PROCESS_OUT_TOKEN:
-    da "O_TKN\n\r",0
-PROCESS_IN_TOKEN:
-    da "I_TKN\n\r",0
+    da "S_DEV_ADDR\r\n",0
 
 MARTY:
-    da "MrY\n\r",0
+    da "MrY\r\n",0
 EP0_SET_ADDR:
-    da "EP0_S_ADDR\n\r",0
+    da "EP ADD\r\n",0
 
 USBSTUFF    code
 getDescriptorByte
@@ -197,8 +202,8 @@ Interface1
 
 EndPoint1
     db            0x07, ENDPOINT        ; bLength, bDescriptorType
-    db            0x01, 0x0F            ; bEndpointAddr & Direction OUT Data Synchronous Interrupt  
-    db            0x04, 0x00            ; four bytes
+    db            0x01, 0x03            ; bEndpointAddr & Direction OUT, No Synch Interrupt  
+    db            0x08, 0x00            ; eight bytes
     db            0x04                  ; Interval...?
 
 String0
@@ -321,15 +326,15 @@ ServiceUSB
         movf    USB_USWSTAT, W, BANKED  ; Load current state into W.
         select
         case POWERED_STATE
-	    ;PrintString POWERED_STATE_STR
+	    PrintString POWERED_STATE_STR
             movlw    0x01
             break
         case DEFAULT_STATE
-	    ;PrintString DEFAULT_STATE_STR
+	    PrintString DEFAULT_STATE_STR
             movlw    0x02
             break
         case ADDRESS_STATE
-	    ;PrintString ADDRESS_STATE_STR
+	    PrintString ADDRESS_STATE_STR
             movlw    0x04
             break
         case CONFIG_STATE
@@ -370,10 +375,20 @@ ServiceUSB
         movwf   BD0IAH, BANKED        ; ...set up its address
         movlw   0x08                  ; clear UOWN bit (MCU can write)
         movwf   BD0IST, BANKED
+
+
+
+
+
+
+
+
         clrf    UADDR, ACCESS         ; set USB Address to 0
         clrf    UIR, ACCESS           ; clear all the USB interrupt flags
         movlw   ENDPT_CONTROL         ; Setup UEP0 by setting EPHSHK, EPOUTEN & EPINEN
         movwf   UEP0, ACCESS          ; EP0 is a control pipe and requires an ACK
+
+
         movlw   0xFF               
         movwf   UEIE, ACCESS          ; Enable all usb error interrupts
         banksel USB_USWSTAT
@@ -393,16 +408,17 @@ ServiceUSB
         movf     USTAT, W, ACCESS  ; Read USTAT register for endpoint information
         andlw    0x7C              ; Mask out bits other than Endpoint and Direction
         movwf    FSR0L, ACCESS     ;    0000100 0EEEED00 (FSR0H-FSR0L)
-        banksel  USB_BufferDescriptor   ; eg 0000100 00000000 EP0 Out-> 400h
-        movf     POSTINC0, W       ;    0000100 00000100 EP0 IN -> 404h
+        banksel  USB_BufferDescriptor   ; eg 0000100 00000000 EP0 Out -> 400h  // are in and out in the correct order
+        movf     POSTINC0, W            ;    0000100 00000100 EP0 IN  -> 404h
+                                        ;    0000100 00001000 EP1 Out -> 408h
+                                        ;    0000100 00001100 EP1 In  -> 40ch
         movwf    USB_BufferDescriptor, BANKED  ; Copy received data to USB_BufferDescriptor
         movf     POSTINC0, W
         movwf    USB_BufferDescriptor+1, BANKED
         movf     POSTINC0, W
         movwf    USB_BufferDescriptor+2, BANKED
         movf     POSTINC0, W
-        movwf    USB_BufferDescriptor+3, BANKED
-                                   ; Now USB_BufferDescriptor now has the details.
+        movwf    USB_BufferDescriptor+3, BANKED ; USB_BufferDescriptor now populated.
         movf     USTAT, W, ACCESS
         movwf    USB_USTAT, BANKED  ; Save the USB status register
         bcf      UIR, TRNIF, ACCESS ; Clear transaction complete interrupt flag
@@ -423,24 +439,30 @@ ServiceUSB
         xorwf   PORTB, F, ACCESS    ; toggle bit 5, 6, or 7 to reflect EP activity
 #endif
         clrf    USB_error_flags, BANKED    ; clear USB error flags
+
+        ;PrintString PROCESS_T
+
         movf    USB_BufferDescriptor, W, BANKED
                                  ; The PID is presented by the SIE in the BDnSTAT
         andlw   0x3C             ; extract PID bits 0011 1100 (PID3:PID2:PID1:PID0)
 
         select
         case TOKEN_SETUP
+            PrintString PROCESS_SETUP_TOKEN_STR
             call        ProcessSetupToken
             break
         case TOKEN_IN
+            PrintString PROCESS_IN_TOKEN_STR
             call        ProcessInToken
             break
         case TOKEN_OUT
-            ;PrintString PROCESS_OUT_TOKEN
+            PrintString PROCESS_OUT_TOKEN_STR
             call        ProcessOutToken
             break
         ends
         banksel USB_error_flags
         ifset USB_error_flags, 0, BANKED    ; if there was a Request Error...
+            PrintString PROCESS_ERR
             banksel BD0OBC
             movlw   MAX_PACKET_SIZE
             movwf   BD0OBC                ; ...get ready to receive the next Setup token...
@@ -874,7 +896,6 @@ StandardRequests
 
     ; >>>>  STANDARD REQUESTS  <<<< ;
     case SET_CONFIGURATION
-        PrintString SET_CONFIG_STR
         ifl USB_BufferData+wValue, LE, NUM_CONFIGURATIONS
             call clearNonControlEndPoints
             movf  USB_BufferData+wValue, W, BANKED
@@ -896,8 +917,11 @@ StandardRequests
                 movlw  0xE0
                 andwf  PORTB, F, ACCESS
                 bsf    PORTB, 3, ACCESS
+                call setupEndpoint1
+                PrintString SET_CONFIG_STR
 #endif
             ends
+
             call updateControlTxZeroBytes
         otherwise
             PrintString SET_CONFIG_ERR_STR
@@ -988,6 +1012,7 @@ ProcessInToken
     andlw 0x18        ; extract the EP bits
     select
     case EP0
+        ;PrintString EP0InStr
         movf USB_dev_req, W, BANKED
         select
         case SET_ADDRESS
@@ -1020,6 +1045,7 @@ ProcessInToken
         ends
         break
     case EP1
+        ;PrintString EP1InStr
 	break
     case EP2
 	break
@@ -1028,10 +1054,10 @@ ProcessInToken
 
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ProcessOutToken
+    PrintString OUTTOK
     banksel  USB_USTAT
     movf     USB_USTAT, W, BANKED
     andlw    0x18        ; extract the EP bits
-    PrintString OUTTOK
     select
     case EP0
 	banksel BD0OBC
@@ -1042,6 +1068,7 @@ ProcessOutToken
         call updateControlTxZeroBytes
 	break
     case EP1
+        ;PrintString EP1OutStr
 	break
     case EP2
 	break
@@ -1112,6 +1139,21 @@ pointToCtrlEPInputBuffer:
     return 
 
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+setupEndpoint1:        
+    banksel BD1OBC
+    movlw   MAX_PACKET_SIZE       ; 8 bytes lowest packet size for low and high speed.
+    movwf   BD1OBC, BANKED
+    movlw   low (USB_Buffer+  2*MAX_PACKET_SIZE)    ; EP1 OUT gets a buffer...
+    movwf   BD1OAL, BANKED
+    movlw   high (USB_Buffer+ 2*MAX_PACKET_SIZE)    ; EP1 OUT gets a buffer...
+    movwf   BD1OAH, BANKED
+    movlw   0xC8                  ; set UOWN bit Data1 Data synchronization enabled.
+    movlw   0x88                  ; set UOWN bit (SIE can write)
+    movwf   BD1OST, BANKED        ; synchronization byte needed?
+
+    movlw   ENDPT_OUT_ONLY        ; EP1 is gets output from host
+    movwf   UEP1, ACCESS          ; 
+    return
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 clearNonControlEndPoints:
     clrf    UEP1, ACCESS          ; to disable all endpoints.
@@ -1154,7 +1196,6 @@ InitUSB
     movwf       PORTB, ACCESS              ; Set bit zero to indicate Powered status.
 #endif
     repeat                                 ; Wait
-	;PrintString USB_INITIALISED_RETRY
 	call Delay
     untilclr    UCON, SE0, ACCESS          ;   ...until initial SE0 condition clears.
                                            ;   SE0 == Single Ended Zero

@@ -16,7 +16,7 @@
 
 #define ENDPT_DISABLED       0x00
 #define ENDPT_IN_ONLY        0x12
-#define ENDPT_OUT_ONLY       0x14
+#define ENDPT_OUT_ONLY       0x14    ; handshake enabled EPOUTEN=1
 #define ENDPT_CONTROL        0x16    ; enable for in, out and setup
 #define ENDPT_NON_CONTROL    0x1E    ; enable for in, and out
 
@@ -27,9 +27,9 @@
 #define INT_STAT_MASK_STALL    0x10
 
 #define TOKEN_OUT    (0x01<<2)
+#define TOKEN_IN     (0x09<<2)
 #define TOKEN_ACK    (0x02<<2)
-#define TOKEN_IN    (0x09<<2)
-#define TOKEN_SETUP    (0x0D<<2)
+#define TOKEN_SETUP  (0x0D<<2)
 
 ; Define buffer descriptor table register mapping for no ping-pong buffers
 #define BD0OST        0x0400
@@ -166,9 +166,9 @@
 #define    UOWN        0x07
 
 ; offsets from the beginning of the Buffer Descriptor
-#define BYTECOUNT    0x01
-#define    ADDRESSL    0x02
-#define ADDRESSH    0x03
+#define BYTECOUNT      0x01
+#define ADDRESSL       0x02
+#define ADDRESSH       0x03
 
 ; standard descriptor types
 #define    DEVICE        1
