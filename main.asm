@@ -139,21 +139,17 @@ STALL_HANDSHAKE_STR:
     da "STLL\r\n",0
 USB_RESET_STR:
     da "RST\r\n",0
-REQ_DEVICE_DESCRIPTOR_STR:
-    da "REQ_D\r\n",0
 GET_DEVICE_DESCRIPTOR_STR:
-    da "G_DEV_DES\r\n",0
+    da "G_DS\r\n",0
 GET_CONFIG_DESCRIPTOR_STR:
-    da "G_CFG_DES\r\n",0
+    da "G_CD\r\n",0
 GET_STRING_DESCRIPTOR_STR:
-    da "G_STR_DES\r\n",0
+    da "G_SD\r\n",0
 SET_DEVICE_ADDRESS_STR:
-    da "S_DEV_ADDR\r\n",0
+    da "S_AD\r\n",0
 
 MARTY:
     da "MrY\r\n",0
-EP0_SET_ADDR:
-    da "EP ADD\r\n",0
 
 USBSTUFF    code
 getDescriptorByte
@@ -456,7 +452,7 @@ ServiceUSB
             call        ProcessInToken
             break
         case TOKEN_OUT
-            PrintString PROCESS_OUT_TOKEN_STR
+            ;PrintString PROCESS_OUT_TOKEN_STR
             call        ProcessOutToken
             break
         ends
@@ -815,7 +811,7 @@ StandardRequests
         movf  USB_BufferData+(wValue+1), W, BANKED
         select
         case DEVICE
-            PrintString REQ_DEVICE_DESCRIPTOR_STR
+            PrintString GET_DEVICE_DESCRIPTOR_STR
             movlw low (Device-Descriptor_begin)
             movwf USB_desc_ptr, BANKED
             call  getDescriptorByte                ; get descriptor length
@@ -825,7 +821,7 @@ StandardRequests
             break
 
         case CONFIGURATION
-            ;PrintString GET_CONFIG_DESCRIPTOR_STR
+            PrintString GET_CONFIG_DESCRIPTOR_STR
             movf USB_BufferData+wValue, W, BANKED
             select
             case 0
@@ -1016,7 +1012,7 @@ ProcessInToken
         movf USB_dev_req, W, BANKED
         select
         case SET_ADDRESS
-            PrintString EP0_SET_ADDR
+            PrintString SET_DEVICE_ADDRESS_STR
             movf   USB_address_pending, W, BANKED
             movwf  UADDR, ACCESS
             select
@@ -1054,7 +1050,7 @@ ProcessInToken
 
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ProcessOutToken
-    PrintString OUTTOK
+    ;PrintString OUTTOK
     banksel  USB_USTAT
     movf     USB_USTAT, W, BANKED
     andlw    0x18        ; extract the EP bits
@@ -1068,7 +1064,13 @@ ProcessOutToken
         call updateControlTxZeroBytes
 	break
     case EP1
-        ;PrintString EP1OutStr
+        PrintString EP1OutStr
+        ; Need to process it and handle
+	banksel BD1OBC
+	movlw   MAX_PACKET_SIZE
+	movwf   BD1OBC, BANKED
+	movlw   0x88
+	movwf   BD1OST, BANKED
 	break
     case EP2
 	break
