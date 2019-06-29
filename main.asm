@@ -61,7 +61,7 @@
 
     
     
-    extern InitUsartComms, print, Delay
+    extern InitUsartComms, print, printData, Delay
     extern print, InterruptServiceRoutine
 
     
@@ -471,28 +471,9 @@ ServiceUSB
     return
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ProcessSetupToken
-    
-    banksel  USB_BufferData
-    movf     USB_BufferDescriptor+ADDRESSH, W, BANKED
-    movwf    FSR0H, ACCESS
-    movf     USB_BufferDescriptor+ADDRESSL, W, BANKED
-    movwf    FSR0L, ACCESS
-    movf     POSTINC0, W
-    movwf    USB_BufferData, BANKED
-    movf     POSTINC0, W
-    movwf    USB_BufferData+1, BANKED  ; Move received bytes to USB_BufferData
-    movf     POSTINC0, W
-    movwf    USB_BufferData+2, BANKED  ; Move received bytes to USB_BufferData
-    movf     POSTINC0, W
-    movwf    USB_BufferData+3, BANKED  ; Move received bytes to USB_BufferData
-    movf     POSTINC0, W
-    movwf    USB_BufferData+4, BANKED  ; Move received bytes to USB_BufferData
-    movf     POSTINC0, W
-    movwf    USB_BufferData+5, BANKED  ; Move received bytes to USB_BufferData
-    movf     POSTINC0, W
-    movwf    USB_BufferData+6, BANKED  ; Move received bytes to USB_BufferData
-    movf     POSTINC0, W
-    movwf    USB_BufferData+7, BANKED  ; Move received bytes to USB_BufferData
+
+    call copyPayloadToBufferData
+
     banksel  BD0OBC
     movlw    MAX_PACKET_SIZE
     movwf    BD0OBC, BANKED      ; reset the byte count
@@ -1065,7 +1046,12 @@ ProcessOutToken
 	break
     case EP1
         PrintString EP1OutStr
+        call copyPayloadToBufferData
         ; Need to process it and handle
+
+
+        PrintData USB_BufferData
+
 	banksel BD1OBC
 	movlw   MAX_PACKET_SIZE
 	movwf   BD1OBC, BANKED
@@ -1140,6 +1126,29 @@ pointToCtrlEPInputBuffer:
     movwf    FSR0L, ACCESS
     return 
 
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+copyPayloadToBufferData:
+    banksel  USB_BufferData
+    movf     USB_BufferDescriptor+ADDRESSH, W, BANKED
+    movwf    FSR0H, ACCESS
+    movf     USB_BufferDescriptor+ADDRESSL, W, BANKED
+    movwf    FSR0L, ACCESS
+    movf     POSTINC0, W
+    movwf    USB_BufferData, BANKED
+    movf     POSTINC0, W
+    movwf    USB_BufferData+1, BANKED  ; Move received bytes to USB_BufferData
+    movf     POSTINC0, W
+    movwf    USB_BufferData+2, BANKED  ; Move received bytes to USB_BufferData
+    movf     POSTINC0, W
+    movwf    USB_BufferData+3, BANKED  ; Move received bytes to USB_BufferData
+    movf     POSTINC0, W
+    movwf    USB_BufferData+4, BANKED  ; Move received bytes to USB_BufferData
+    movf     POSTINC0, W
+    movwf    USB_BufferData+5, BANKED  ; Move received bytes to USB_BufferData
+    movf     POSTINC0, W
+    movwf    USB_BufferData+6, BANKED  ; Move received bytes to USB_BufferData
+    movf     POSTINC0, W
+    movwf    USB_BufferData+7, BANKED  ; Move received bytes to USB_BufferData
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 setupEndpoint1:        
     banksel BD1OBC

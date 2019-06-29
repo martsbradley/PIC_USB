@@ -11,6 +11,7 @@
     global SHADOW_RS232_PTRU
     global SHADOW_RS232_PTRH
     global SHADOW_RS232_PTRL
+    global PRINTDATA_OR_PROG
 
 ACCESS_DATA  udata_acs
 PCLATH_TEMP  res 1
@@ -19,6 +20,9 @@ TBLPTRU_TEMP res 1  ; These need saved because the RS232 interrupt uses them.
 TBLPTRH_TEMP res 1
 TBLPTRL_TEMP res 1
 TABLAT_TEMP  res 1
+
+FSR2H_TEMP res 1
+FSR2L_TEMP res 1
 
 
 SHADOW_RS232_PTRU   res 1  ; The Macro PrintString will overwrite these without
@@ -29,6 +33,8 @@ SHADOW_RS232_PTRL   res 1  ; variables below.  The function print
 RS232_PTRU          res 1  ; These store the current print head of the RS232 output.
 RS232_PTRH          res 1
 RS232_PTRL          res 1
+
+PRINTDATA_OR_PROG           res 1  ; 0x01 if Data, otherwise print from program memory
 
 
    
@@ -62,6 +68,11 @@ InterruptServiceRoutine:
     MOVF TABLAT, W
     MOVWF TABLAT_TEMP, ACCESS
 
+    MOVF FSR2H, W
+    MOVWF FSR2H_TEMP, ACCESS
+
+    MOVF FSR2L, W
+    MOVWF FSR2L_TEMP, ACCESS
 
 InterruptTransmitRS232Ready:
     btfss PIR1, TXIF, ACCESS ;skip if TXIF == 1 means ready to send another byte.
@@ -73,6 +84,10 @@ InterruptTransmitRS232Ready:
 
     ; Now need to restore the saved RS232 table pointers to the table
 
+    btfsc PRINTDATA_OR_PROG, 0, ACCESS   ; Check whether to send data from program 
+    goto SendRS232FromData               ; memory or from data?
+
+SendRS232FromProgram:
     movf RS232_PTRU, W
     movwf TBLPTRU, ACCESS
 
@@ -102,6 +117,30 @@ InterruptTransmitRS232Ready:
 
     movf TBLPTRL, W
     movwf RS232_PTRL, ACCESS
+    goto InterruptServiceEnd
+
+
+SendRS232FromData:
+    movf RS232_PTRH, W
+    movwf FSR2H, ACCESS
+
+    movf RS232_PTRL, W
+    movwf FSR2L, ACCESS
+
+
+    movf POSTINC2, W    ; Read byte and increment pointer
+
+    addlw 0x00              ; Check for end of string \0 character
+    btfsc STATUS,Z, ACCESS  ; If zero bit is clear, skip the goto
+    goto InterruptRS232TxDone
+
+    movwf TXREG,ACCESS      ; Send the data
+
+    movf FSR2H, W
+    movwf RS232_PTRH, ACCESS
+
+    movf FSR2L, W
+    movwf RS232_PTRL, ACCESS
 
     goto InterruptServiceEnd
 
@@ -112,6 +151,12 @@ InterruptRS232TxDone:
     bcf PIE1, TXIE,  ACCESS   ; Disable interrupts
 
 InterruptServiceEnd:
+
+    movf FSR2H_TEMP, W
+    movwf FSR2H, ACCESS
+
+    movf FSR2L_TEMP, W            
+    movwf FSR2L, ACCESS
 
     movf TABLAT_TEMP, W   ; restore table pointer registers.
     movwf TABLAT, ACCESS

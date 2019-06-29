@@ -1,6 +1,6 @@
     #include p18f2550.inc
     #include util_macros.inc
-    global print, InitUsartComms, 
+    global print,printData, InitUsartComms, 
     extern RS232_PTRU
     extern RS232_PTRH
     extern RS232_PTRL
@@ -8,6 +8,7 @@
     extern SHADOW_RS232_PTRU
     extern SHADOW_RS232_PTRH
     extern SHADOW_RS232_PTRL
+    extern PRINTDATA_OR_PROG
 
 
 ; To make this RS232 transmission interrupt driven
@@ -40,8 +41,19 @@ RS232_CODE  code
 
 print:
     btfsc PIE1, TXIE , ACCESS   ; skip next if TXIE == 1 skip prints if tx is busy
+    bcf PRINTDATA_OR_PROG, 0, ACCESS ;Set program memory flag
+    call printCore
     return
 
+printData:
+    btfsc PIE1, TXIE , ACCESS   ; skip next if TXIE == 1 skip prints if tx is busy
+
+    bsf PRINTDATA_OR_PROG, 0, ACCESS  ;Set data memory flag
+    call printCore
+    return
+
+
+printCore:
     movf SHADOW_RS232_PTRU, W  
     movwf RS232_PTRU           
                                
@@ -54,6 +66,13 @@ print:
     bsf TXSTA, TXEN, ACCESS  ; Enable transmission, causes an interrupt.
     bsf PIE1, TXIE , ACCESS  ; Enable interrupts
     return
+
+
+
+
+
+
+
     
 InitUsartComms:                 ; Setup the usart hardware
     bsf   TRISC, 7, ACCESS
