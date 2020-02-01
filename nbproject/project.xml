@@ -12,6 +12,72 @@
             <sourceEncoding>ISO-8859-1</sourceEncoding>
             <asminc-extensions>inc</asminc-extensions>
             <make-dep-projects/>
+            <sourceRootList/>
+            <confList>
+                <confElem>
+                    <name>C18_18F87K22</name>
+                    <type>2</type>
+                </confElem>
+                <confElem>
+                    <name>XC8_18F87K22</name>
+                    <type>2</type>
+                </confElem>
+                <confElem>
+                    <name>PICC18_18F87K22</name>
+                    <type>2</type>
+                </confElem>
+                <confElem>
+                    <name>C18_18F1220</name>
+                    <type>2</type>
+                </confElem>
+                <confElem>
+                    <name>PICC18_18F1220</name>
+                    <type>2</type>
+                </confElem>
+                <confElem>
+                    <name>XC8_18F1220</name>
+                    <type>2</type>
+                </confElem>
+                <confElem>
+                    <name>C18_18F14K50</name>
+                    <type>2</type>
+                </confElem>
+                <confElem>
+                    <name>PICC18_18F14K50</name>
+                    <type>2</type>
+                </confElem>
+                <confElem>
+                    <name>XC8_18F14K50</name>
+                    <type>2</type>
+                </confElem>
+                <confElem>
+                    <name>C18_18F46J11</name>
+                    <type>2</type>
+                </confElem>
+                <confElem>
+                    <name>PICC18_18F46J11</name>
+                    <type>2</type>
+                </confElem>
+                <confElem>
+                    <name>XC8_18F46J11</name>
+                    <type>2</type>
+                </confElem>
+                <confElem>
+                    <name>C18_18F87J60</name>
+                    <type>2</type>
+                </confElem>
+                <confElem>
+                    <name>PICC18_18F97J60</name>
+                    <type>2</type>
+                </confElem>
+                <confElem>
+                    <name>XC8_18F97J60</name>
+                    <type>2</type>
+                </confElem>
+            </confList>
+            <formatting>
+                <project-formatting-style>false</project-formatting-style>
+            </formatting>
         </data>
     </configuration>
 </project>
