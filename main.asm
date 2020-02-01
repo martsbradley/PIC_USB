@@ -111,12 +111,14 @@ PROCESS_OUT_TOKEN_STR:
     da "x",0
 PROCESS_IN_TOKEN_STR:
     da "i",0
-EP1InStr:
-    da "Z",0
-EP1OutStr:
-    da "T",0
 EP0InStr:
     da "z",0
+EP1InStr:
+    da "Z",0
+EP2InStr:
+    da "J",0
+EP1OutStr:
+    da "T",0
 SET_CONFIG_STR:
     da "q",0
 HELLO_WORLD:
@@ -185,14 +187,14 @@ Device
 
 Configuration1
     db            0x09, CONFIGURATION   ; bLength, bDescriptorType
-    db            0x19, 0x00            ; wTotalLength (low byte), wTotalLength (high byte)
+    db            0x20, 0x00            ; wTotalLength (low byte), wTotalLength (high byte)
     db            NUM_INTERFACES, 0x01  ; bNumInterfaces, bConfigurationValue
     db            0x03, 0xA0            ; iConfiguration String idx , bmAttributes
-    db            0x32, 0x09            ; bMaxPower (100 mA), bLength (Interface1 descriptor starts here)
+    db            0x32, 0x09            ; bMaxPower (100 mA), bLength (***Interface1 descriptor starts here)
 
 Interface1
     db            INTERFACE, 0x00       ; bDescriptorType, bInterfaceNumber
-    db            0x00, 0x01            ; bAlternateSetting, bNumEndpoints (excluding EP0)
+    db            0x00, 0x02            ; bAlternateSetting, bNumEndpoints (excluding EP0)
     db            0xFF, 0x00            ; bInterfaceClass (vendor specific class code), bInterfaceSubClass
     db            0xFF, 0x04            ; bInterfaceProtocol (vendor specific), iInterface String idx
 
@@ -200,7 +202,18 @@ EndPoint1
     db            0x07, ENDPOINT        ; bLength, bDescriptorType
     db            0x01, 0x03            ; bEndpointAddr & Direction OUT, No Synch Interrupt  
     db            0x08, 0x00            ; eight bytes
-    db            0x04                  ; Interval...?
+    db            0x04, 0x07            ; Interval...?  bLength (endpoitn2)
+
+EndPoint2
+    db            ENDPOINT, 0x82        ; bDescriptorType, bEndpointAddr & Direction IN
+    db            0x03, 0x01            ; No Synch Interrupt  
+    db            0x00, 0x04            ; one byte
+    
+;EndPoint2
+;    db            0x07, ENDPOINT        ; bLength, bDescriptorType
+;    db            0x82, 0x03            ; bEndpointAddr & Direction IN, No Synch Interrupt  
+;    db            0x01, 0x00            ; one byte
+;    db            0x04                  ; Interval...?    
 
 String0
     db            String1-String0, STRING    ; bLength, bDescriptorType
@@ -448,7 +461,6 @@ ServiceUSB
             call        ProcessSetupToken
             break
         case TOKEN_IN
-            PrintString PROCESS_IN_TOKEN_STR
             call        ProcessInToken
             break
         case TOKEN_OUT
@@ -987,6 +999,7 @@ ProcessInToken
     banksel USB_USTAT
     movf  USB_USTAT, W, BANKED
     andlw 0x18        ; extract the EP bits
+    ;PrintString PROCESS_IN_TOKEN_STR
     select
     case EP0
         ;PrintString EP0InStr
@@ -1022,9 +1035,10 @@ ProcessInToken
         ends
         break
     case EP1
-        ;PrintString EP1InStr
+        PrintString EP1InStr
 	break
     case EP2
+        PrintString EP2InStr
 	break
     ends
     return
