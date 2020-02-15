@@ -907,7 +907,11 @@ StandardRequests
                 andwf  PORTB, F, ACCESS
                 bsf    PORTB, 3, ACCESS
                 call setupEndpoint1
-                PrintString SET_CONFIG_STR
+		call setupEndpoint2
+		
+		
+		
+               ; PrintString SET_CONFIG_STR
 #endif
             ends
 
@@ -1039,6 +1043,22 @@ ProcessInToken
 	break
     case EP2
         PrintString EP2InStr
+	;Send something to the host over USB.
+	
+	
+        movlw   low (USB_Buffer+  4*MAX_PACKET_SIZE)
+        movwf    FSR0L, ACCESS     
+        movlw   high (USB_Buffer+ 4*MAX_PACKET_SIZE)
+        movwf   FSR0H, ACCESS
+	
+	movlw   0x65  ; Char 'a'?
+        movwf   POSTINC0
+		
+	banksel BD2IBC
+	movlw   1
+	movwf   BD2IBC, BANKED
+	movlw   0x88
+	movwf   BD2IST, BANKED
 	break
     ends
     return
@@ -1061,9 +1081,9 @@ ProcessOutToken
     case EP1
         PrintString EP1OutStr
         call copyPayloadToBufferData
-        ; Need to process it and handle
-
-
+        ; Receive data from the host.
+	; and copy it to the RS232.
+	
         PrintData USB_BufferData
 
 	banksel BD1OBC
@@ -1179,6 +1199,25 @@ setupEndpoint1:
     movlw   ENDPT_OUT_ONLY        ; EP1 is gets output from host
     movwf   UEP1, ACCESS          ; 
     return
+    
+    
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+setupEndpoint2:
+    banksel BD2IBC
+    movlw   MAX_PACKET_SIZE       ; 8 bytes lowest packet size for low and high speed.
+    movwf   BD2IBC, BANKED
+    movlw   low (USB_Buffer+  4*MAX_PACKET_SIZE)    ; EP1 OUT gets a buffer...
+    movwf   BD2IAL, BANKED
+    movlw   high (USB_Buffer+ 4*MAX_PACKET_SIZE)    ; EP1 OUT gets a buffer...
+    movwf   BD2IAH, BANKED
+    movlw   0x08                  ; clear UOWN bit (SIE disabled,
+                                  ;                 cpu can write)
+    movwf   BD1OST, BANKED        ; synchronization byte needed?
+
+    movlw   ENDPT_IN_ONLY        ; EP1 is gets output from host
+    movwf   UEP2, ACCESS          ; 
+    return
+    
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 clearNonControlEndPoints:
     clrf    UEP1, ACCESS          ; to disable all endpoints.
