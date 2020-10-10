@@ -78,8 +78,8 @@ InitUsartComms:                 ; Setup the usart hardware
     bsf   TRISC, 7, ACCESS
     bsf   TRISC, 6, ACCESS
     banksel TXSTA
-    ;movlw 0x19                 ; BAUD 9600  & FOSC 4000000L
-    movlw 0x0c                  ; BAUD 19200 & FOSC 4000000L
+    movlw 0x19                 ; BAUD 9600  & FOSC 4000000L
+    ;movlw 0x0c                  ; BAUD 19200 & FOSC 4000000L
     movwf SPBRG,ACCESS          ; 8 bit communication rather than 9bit
     movlw 0x04                  ; TXEN = 0, BRGH = 1
     movwf TXSTA,ACCESS          ; Asynchronous, TXEN

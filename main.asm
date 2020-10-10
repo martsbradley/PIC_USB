@@ -200,7 +200,7 @@ Interface1
 
 EndPoint1
     db            0x07, ENDPOINT        ; bLength, bDescriptorType
-    db            0x01, 0x03            ; bEndpointAddr & Direction OUT, No Synch Interrupt  
+    db            0x01, 0x03            ; (EP1 & Dir OUT), (Interrupt & No Synch)
     db            0x08, 0x00            ; eight bytes
     db            0x04, 0x07            ; Interval...?  bLength (endpoitn2)
 
@@ -457,10 +457,11 @@ ServiceUSB
 
         select
         case TOKEN_SETUP
-            PrintString PROCESS_SETUP_TOKEN_STR
+            ;PrintString PROCESS_SETUP_TOKEN_STR
             call        ProcessSetupToken
             break
         case TOKEN_IN
+            ;PrintString PROCESS_IN_TOKEN_STR
             call        ProcessInToken
             break
         case TOKEN_OUT
@@ -907,11 +908,10 @@ StandardRequests
                 andwf  PORTB, F, ACCESS
                 bsf    PORTB, 3, ACCESS
                 call setupEndpoint1
-		call setupEndpoint2
+		;call setupEndpoint2
 		
 		
 		
-               ; PrintString SET_CONFIG_STR
 #endif
             ends
 
@@ -1079,7 +1079,7 @@ ProcessOutToken
         call updateControlTxZeroBytes
 	break
     case EP1
-        PrintString EP1OutStr
+        ; PrintString EP1OutStr
         call copyPayloadToBufferData
         ; Receive data from the host.
 	; and copy it to the RS232.
@@ -1089,7 +1089,7 @@ ProcessOutToken
 	banksel BD1OBC
 	movlw   MAX_PACKET_SIZE
 	movwf   BD1OBC, BANKED
-	movlw   0x88
+	movlw   0x80   ;  DISABLED SYNCHRONIATION DATA0/DATA1 ETC.
 	movwf   BD1OST, BANKED
 	break
     case EP2
@@ -1319,3 +1319,12 @@ Main
 ;   USB MICRO b    https://coolcomponents.co.uk/products/usb-b-socket-breakout-board
 ;   Do I have the capacitors.
 ;   DO I have the lead for that micro?
+
+    
+    
+    ;Software for pic stored at
+    ;/home/martin/Software/PIC/MPLAB_Projects/USB_Proj2/USB_Proj2.X
+    
+    ;  lsusb  -d 04d8:0014 -v
+    
+    
