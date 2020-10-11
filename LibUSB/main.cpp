@@ -13,6 +13,28 @@ void printDetails(libusb_context *ctx);
 libusb_device_handle* getDeviceHandle(libusb_context *ctx);
 libusb_device_handle* setConfiguration(libusb_device_handle* dev_handle);
 
+void showError(int result) {
+        switch(result) {
+        case LIBUSB_ERROR_TIMEOUT:
+            cout << "The transfer timed out " << endl;
+            break;
+        case LIBUSB_ERROR_PIPE :
+            cout << "The endpoint halted " << endl;
+            break;
+        case LIBUSB_ERROR_OVERFLOW :
+            cout << "The device offered more data, see Packets and overflows " << endl;
+            break;
+        case LIBUSB_ERROR_NO_DEVICE :
+            cout << "The device has been disconnected " << endl;
+            break;
+        case LIBUSB_ERROR_BUSY :
+            cout << "if called from event handling context " << endl;
+            break;
+        default:
+            cout << "Other error with code (" << result << ")" << endl;
+        };
+}
+
 int main() 
 {
     libusb_context *ctx = NULL; //a libusb session
@@ -40,19 +62,35 @@ int main()
     data[6]='\n';
     data[7]='\0'; 
 
-    unsigned char *data3 = new unsigned char[8];
-    snprintf((char*)data3, 8, "Tx%d",88);
-    printf("%s",data3);
-
     if (dev_handle) { 
         int result = -1;
-        int tries = 100;
-        while (tries-- > 0) {
+        int tries = 5;
+   //   while (tries-- > 0) {
 
-            snprintf((char*)data, 8, "%d\r\n",tries);
-            result = interruptTransferOut(dev_handle,data);
-            usleep(3000);
-        }
+   //       snprintf((char*)data, 8, "%d\r\n",tries);
+   //       result = interruptTransferOut(dev_handle,data);
+   //       usleep(3000);
+   //   }
+
+
+        unsigned int timeout = 0;
+
+        int transferred = 0;
+
+        unsigned char endpointId = 2 |LIBUSB_ENDPOINT_IN;
+        result = libusb_interrupt_transfer(dev_handle,
+                                           endpointId,
+                                           data,
+                                           8,
+                                           &transferred,
+                                           timeout);
+
+        cout << "received? " << result << endl;
+        showError(result);
+
+
+
+
 
         libusb_close(dev_handle); 
     }
@@ -103,6 +141,7 @@ libusb_device_handle* getDeviceHandle(libusb_context *ctx) {
           cout<<"Kernel Driver Detached!"<<endl;
 	}
     }
+
     if (!dev_handle) {
         cout << "dev_handle is null" << endl;
     }
@@ -139,6 +178,8 @@ libusb_device_handle* claimInterface(libusb_device_handle *dev_handle) {
 void resetDevice(libusb_device_handle* dev_handle) {
     libusb_reset_device(dev_handle); 
 }
+
+
 
 int interruptTransferOut(libusb_device_handle* dev_handle, unsigned char *data) {
 
@@ -178,6 +219,7 @@ int interruptTransferOut(libusb_device_handle* dev_handle, unsigned char *data) 
     }
 
     return result;
+
 }
 
 void printDetails(libusb_context *ctx) {

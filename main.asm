@@ -206,7 +206,7 @@ EndPoint1
 
 EndPoint2
     db            ENDPOINT, 0x82        ; bDescriptorType, bEndpointAddr & Direction IN
-    db            0x03, 0x01            ; No Synch Interrupt  
+    db            0x03, 0x08            ; No Synch Interrupt  
     db            0x00, 0x04            ; one byte
     
 ;EndPoint2
@@ -908,7 +908,7 @@ StandardRequests
                 andwf  PORTB, F, ACCESS
                 bsf    PORTB, 3, ACCESS
                 call setupEndpoint1
-		;call setupEndpoint2
+		call setupEndpoint2
 		
 		
 		
@@ -1047,17 +1047,33 @@ ProcessInToken
 	
 	
         movlw   low (USB_Buffer+  4*MAX_PACKET_SIZE)
-        movwf    FSR0L, ACCESS     
+        movwf   FSR0L, ACCESS     
         movlw   high (USB_Buffer+ 4*MAX_PACKET_SIZE)
         movwf   FSR0H, ACCESS
 	
 	movlw   0x65  ; Char 'a'?
         movwf   POSTINC0
-		
+	movlw   0x66  ; Char 'b'?
+        movwf   POSTINC0
+	movlw   0x67  ; Char 'c'?
+        movwf   POSTINC0
+	movlw   0x68  ; Char 'd'?
+        movwf   POSTINC0
+	movlw   0x69  ; Char 'e'?
+        movwf   POSTINC0
+	movlw   0x00  ; Char '\0'
+        movwf   POSTINC0
+	movlw   0x00  ; Char '\0'
+        movwf   POSTINC0
+	movlw   0x00  ; Char '\0'
+        movwf   POSTINC0
+	
+	
+	
 	banksel BD2IBC
-	movlw   1
+	movlw   8
 	movwf   BD2IBC, BANKED
-	movlw   0x88
+	movlw   0x00
 	movwf   BD2IST, BANKED
 	break
     ends
@@ -1210,9 +1226,8 @@ setupEndpoint2:
     movwf   BD2IAL, BANKED
     movlw   high (USB_Buffer+ 4*MAX_PACKET_SIZE)    ; EP1 OUT gets a buffer...
     movwf   BD2IAH, BANKED
-    movlw   0x08                  ; clear UOWN bit (SIE disabled,
-                                  ;                 cpu can write)
-    movwf   BD1OST, BANKED        ; synchronization byte needed?
+    movlw   0x80                  ;CPU owns buffer, no syn
+    movwf   BD2IST, BANKED        ; synchronization byte needed?
 
     movlw   ENDPT_IN_ONLY        ; EP1 is gets output from host
     movwf   UEP2, ACCESS          ; 
