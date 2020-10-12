@@ -1051,19 +1051,19 @@ ProcessInToken
         movlw   high (USB_Buffer+ 4*MAX_PACKET_SIZE)
         movwf   FSR0H, ACCESS
 	
-	movlw   0x65  ; Char 'a'?
+	movlw   0x41  ; Char 'a'?
         movwf   POSTINC0
-	movlw   0x66  ; Char 'b'?
+	movlw   0x42  ; Char 'b'?
         movwf   POSTINC0
-	movlw   0x67  ; Char 'c'?
+	movlw   0x43  ; Char 'c'?
         movwf   POSTINC0
-	movlw   0x68  ; Char 'd'?
+	movlw   0x44  ; Char 'd'?
         movwf   POSTINC0
-	movlw   0x69  ; Char 'e'?
+	movlw   0x45  ; Char 'e'?
         movwf   POSTINC0
-	movlw   0x00  ; Char '\0'
+	movlw   0x46  ; Char '\0'
         movwf   POSTINC0
-	movlw   0x00  ; Char '\0'
+	movlw   0x47  ; Char '\0'
         movwf   POSTINC0
 	movlw   0x00  ; Char '\0'
         movwf   POSTINC0

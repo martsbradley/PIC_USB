@@ -35,69 +35,6 @@ void showError(int result) {
         };
 }
 
-int main() 
-{
-    libusb_context *ctx = NULL; //a libusb session
-    int result = libusb_init(&ctx); //initialize a library session
-    if(result < 0) {
-        cout<<"Init Error "<< result <<endl; //there was an error
-                return 1;
-    }
-
-    printDetails(ctx);
-
-    libusb_device_handle* dev_handle = getDeviceHandle(ctx);
-
-    dev_handle = setConfiguration(dev_handle);
-
-    dev_handle = claimInterface(dev_handle);
-
-    unsigned char *data = new unsigned char[8];      //data to write
-    data[0]='m';
-    data[1]='a';
-    data[2]='r';
-    data[3]='t';
-    data[4]='s';
-    data[5]='\r';
-    data[6]='\n';
-    data[7]='\0'; 
-
-    if (dev_handle) { 
-        int result = -1;
-        int tries = 5;
-   //   while (tries-- > 0) {
-
-   //       snprintf((char*)data, 8, "%d\r\n",tries);
-   //       result = interruptTransferOut(dev_handle,data);
-   //       usleep(3000);
-   //   }
-
-
-        unsigned int timeout = 0;
-
-        int transferred = 0;
-
-        unsigned char endpointId = 2 |LIBUSB_ENDPOINT_IN;
-        result = libusb_interrupt_transfer(dev_handle,
-                                           endpointId,
-                                           data,
-                                           8,
-                                           &transferred,
-                                           timeout);
-
-        cout << "received? " << result << endl;
-        showError(result);
-
-
-
-
-
-        libusb_close(dev_handle); 
-    }
-
-    libusb_exit(ctx); //close the session
-    return 0;
-}
 
 libusb_device_handle* setConfiguration(libusb_device_handle* dev_handle) {
 
@@ -291,4 +228,87 @@ void printdev(libusb_device *dev)
 
 
     libusb_free_config_descriptor(config);
+}
+int main() 
+{
+    libusb_context *ctx = NULL; //a libusb session
+    int result = libusb_init(&ctx); //initialize a library session
+    if(result < 0) {
+        cout<<"Init Error "<< result <<endl; //there was an error
+                return 1;
+    }
+
+    printDetails(ctx);
+
+    libusb_device_handle* dev_handle = getDeviceHandle(ctx);
+
+    dev_handle = setConfiguration(dev_handle);
+
+    dev_handle = claimInterface(dev_handle);
+
+    unsigned char *data = new unsigned char[10];      //data to write
+    data[0]='m';
+    data[1]='a';
+    data[2]='r';
+    data[3]='t';
+    data[4]='s';
+    data[5]='\r';
+    data[6]='\n';
+    data[7]='\0'; 
+    data[8]='\0'; 
+    data[9]='\0'; 
+
+    if (dev_handle) { 
+        int result = -1;
+        int tries = 5;
+        while (tries-- > 0) {
+
+            snprintf((char*)data, 8, "%d\r\n",tries);
+            result = interruptTransferOut(dev_handle,data);
+            usleep(3000);
+        }
+
+
+        unsigned int timeout = 500;
+
+        int transferred = 0;
+
+        data[0] = '\0';
+        data[1] = '\0';
+        data[2] = '\0';
+        data[3] = '\0';
+
+        usleep(3000);
+
+        unsigned char endpointId = 2 |LIBUSB_ENDPOINT_IN;
+        result = libusb_interrupt_transfer(dev_handle,
+                                           endpointId,
+                                           data,
+                                           8,
+                                           &transferred,
+                                           timeout);
+        if (result == 0) {
+            cout << "Transferred bytes: "  << transferred << endl;
+            cout <<                 data[0] << endl;
+            cout <<                 data[1] << endl;
+            cout <<                 data[2] << endl;
+            cout <<                 data[3] << endl;
+            cout <<                 data[4] << endl;
+            cout <<                 data[5] << endl;
+            cout <<                 data[6] << endl;
+            cout <<                 data[7] << endl;
+        }
+        else {
+            showError(result);
+        }
+
+
+
+
+
+        libusb_close(dev_handle); 
+    }
+
+    libusb_exit(ctx); //close the session
+    return 0;
 }
