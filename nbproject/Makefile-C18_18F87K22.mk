@@ -186,11 +186,3 @@ endif
 .clean-conf: ${CLEAN_SUBPROJECTS}
 	${RM} -r build/C18_18F87K22
 	${RM} -r dist/C18_18F87K22
-
-# Enable dependency checking
-.dep.inc: .depcheck-impl
-
-DEPFILES=$(shell "${PATH_TO_IDE_BIN}"mplabwildcard ${POSSIBLE_DEPFILES})
-ifneq (${DEPFILES},)
-include ${DEPFILES}
-endif
