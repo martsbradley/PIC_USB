@@ -61,27 +61,45 @@
 
     
     
-    extern InitUsartComms, print, printData, Delay
-    extern print, InterruptServiceRoutine
+    extern PrintStrFn
+    extern InitUsartComms, Delay
+    extern InterruptServiceRoutine
+
+    global RS232_RINGBUFFER, RS232_RINGBUFFER_HEAD, RS232_RINGBUFFER_TAIL
+    global RS232_Temp_StrLen, RS232_Temp1, RS232_Temp2, RS232_Temp3
+    global RS232_Temp4, RS232_Temp5, RS232_Temp6, RS232_Temp7
+
 
     
 ;bank0        udata
 mybank1 udata   0x300
-USB_BufferDescriptor     res    4
-USB_BufferData     res    8
-USB_error_flags     res    1  ; Was there an error.
-USB_curr_config     res    1  ; Holds the value of the current configuration.
-USB_device_status   res    1  ; Byte, sent to host request status
-USB_dev_req         res    1
-USB_address_pending res    1
-USB_desc_ptr        res    1  ; address of descriptor
-USB_bytes_left      res    1
-USB_loop_index      res    1
-USB_packet_length   res    1
-USB_USTAT           res    1 ; Saved copy of USTAT special function register in memory.
-USB_USWSTAT         res    1 ; Current state POWERED_STATE|DEFAULT_STATE|ADDRESS_STATE|CONFIG_STATE 
-COUNTER_L           res    1
-COUNTER_H           res    1
+RS232_RINGBUFFER      res SIZE         ;  this should be aligned on a byte.
+RS232_RINGBUFFER_HEAD res 1
+RS232_RINGBUFFER_TAIL res 1
+RS232_Temp_StrLen     res 1
+RS232_Temp1           res 1
+RS232_Temp2           res 1
+RS232_Temp3           res 1
+RS232_Temp4           res 1
+RS232_Temp5           res 1
+RS232_Temp6           res 1
+RS232_Temp7           res 1
+
+USB_BufferDescriptor  res 4
+USB_BufferData        res 8
+USB_error_flags       res 1  ; Was there an error.
+USB_curr_config       res 1  ; Holds the value of the current configuration.
+USB_device_status     res 1  ; Byte, sent to host request status
+USB_dev_req           res 1
+USB_address_pending   res 1
+USB_desc_ptr          res 1  ; address of descriptor
+USB_bytes_left        res 1
+USB_loop_index        res 1
+USB_packet_length     res 1
+USB_USTAT             res 1 ; Saved copy of USTAT special function register in memory.
+USB_USWSTAT           res 1 ; Current state POWERED_STATE|DEFAULT_STATE|ADDRESS_STATE|CONFIG_STATE 
+COUNTER_L             res 1
+COUNTER_H             res 1
 
 LAUNCH_PROGRAM code     0x00  
     goto        Main                    ; Reset vector
@@ -116,7 +134,7 @@ EP0InStr:
 EP1InStr:
     da "Z",0
 EP2InStr:
-    da "J",0
+    da "EP2InStr\r\n",0
 EP1OutStr:
     da "T",0
 SET_CONFIG_STR:
@@ -124,7 +142,7 @@ SET_CONFIG_STR:
 HELLO_WORLD:
     da "Hi\r\n",0
 POWERED_STATE_STR:
-    da "Pwd\r\n",0
+    da "Power\r\n",0
 ADDRESS_STATE_STR:
     da "ADDR\r\n",0
 DEFAULT_STATE_STR:
@@ -134,11 +152,11 @@ USB_INITIALISED:
 SET_CONFIG_ERR_STR:
     da "e",0
 PIC_CONFIGURED:
-    da "CFGED\r\n",0
+    da "Configured\r\n",0
 IDLE_CONDITION:
-    da "IDL\r\n",0
+    da "Idle\r\n",0
 STALL_HANDSHAKE_STR:
-    da "STLL\r\n",0
+    da "Stall\r\n",0
 USB_RESET_STR:
     da "RST\r\n",0
 GET_DEVICE_DESCRIPTOR_STR:
@@ -323,7 +341,7 @@ ServiceUSB
         andwf  PORTB, F, ACCESS       ;  AND 0xE0 with PORTB and store in PORTB
         bsf    PORTB, 4, ACCESS       ;  Also set bit 4 of PORTB
 #endif
-	PrintString IDLE_CONDITION
+	PrintStr IDLE_CONDITION
         break
     caseset UIR, ACTVIF, ACCESS       ;  There was activity on the USB
         bcf    UIR, ACTVIF, ACCESS    ;  Clear the activity detection flag.
@@ -335,15 +353,15 @@ ServiceUSB
         movf    USB_USWSTAT, W, BANKED  ; Load current state into W.
         select
         case POWERED_STATE
-	    PrintString POWERED_STATE_STR
+	    PrintStr POWERED_STATE_STR
             movlw    0x01
             break
         case DEFAULT_STATE
-	    PrintString DEFAULT_STATE_STR
+	    PrintStr DEFAULT_STATE_STR
             movlw    0x02
             break
         case ADDRESS_STATE
-	    PrintString ADDRESS_STATE_STR
+	    PrintStr ADDRESS_STATE_STR
             movlw    0x04
             break
         case CONFIG_STATE
@@ -354,10 +372,10 @@ ServiceUSB
         break
     caseset     UIR, STALLIF, ACCESS  ; A stall handshake was sent by the SIE
         bcf     UIR, STALLIF, ACCESS  ; clear the stall handshake
-	PrintString STALL_HANDSHAKE_STR
+	PrintStr STALL_HANDSHAKE_STR
         break
     caseset UIR, URSTIF, ACCESS    ; USB Reset occurred.
-	PrintString USB_RESET_STR
+	PrintStr USB_RESET_STR
 	
         banksel USB_curr_config
         clrf    USB_curr_config, BANKED
@@ -449,7 +467,7 @@ ServiceUSB
 #endif
         clrf    USB_error_flags, BANKED    ; clear USB error flags
 
-        ;PrintString PROCESS_T
+        ;PrintStr PROCESS_T
 
         movf    USB_BufferDescriptor, W, BANKED
                                  ; The PID is presented by the SIE in the BDnSTAT
@@ -457,21 +475,21 @@ ServiceUSB
 
         select
         case TOKEN_SETUP
-            ;PrintString PROCESS_SETUP_TOKEN_STR
+            ;PrintStr PROCESS_SETUP_TOKEN_STR
             call        ProcessSetupToken
             break
         case TOKEN_IN
-            ;PrintString PROCESS_IN_TOKEN_STR
+            ;PrintStr PROCESS_IN_TOKEN_STR
             call        ProcessInToken
             break
         case TOKEN_OUT
-            ;PrintString PROCESS_OUT_TOKEN_STR
+            ;PrintStr PROCESS_OUT_TOKEN_STR
             call        ProcessOutToken
             break
         ends
         banksel USB_error_flags
         ifset USB_error_flags, 0, BANKED    ; if there was a Request Error...
-            PrintString PROCESS_ERR
+            PrintStr PROCESS_ERR
             banksel BD0OBC
             movlw   MAX_PACKET_SIZE
             movwf   BD0OBC                ; ...get ready to receive the next Setup token...
@@ -790,7 +808,7 @@ StandardRequests
         ifset USB_BufferData+wValue, 7, BANKED        ; if new device address is illegal, send Request Error
             bsf USB_error_flags, 0, BANKED    ; set Request Error flag
         otherwise
-            ;PrintString SET_DEVICE_ADDRESS_STR
+            ;PrintStr SET_DEVICE_ADDRESS_STR
             movlw   SET_ADDRESS
             movwf   USB_dev_req, BANKED           ; processing a set address request
             movf    USB_BufferData+wValue, W, BANKED
@@ -805,7 +823,7 @@ StandardRequests
         movf  USB_BufferData+(wValue+1), W, BANKED
         select
         case DEVICE
-            PrintString GET_DEVICE_DESCRIPTOR_STR
+            PrintStr GET_DEVICE_DESCRIPTOR_STR
             movlw low (Device-Descriptor_begin)
             movwf USB_desc_ptr, BANKED
             call  getDescriptorByte                ; get descriptor length
@@ -815,7 +833,7 @@ StandardRequests
             break
 
         case CONFIGURATION
-            PrintString GET_CONFIG_DESCRIPTOR_STR
+            PrintStr GET_CONFIG_DESCRIPTOR_STR
             movf USB_BufferData+wValue, W, BANKED
             select
             case 0
@@ -836,7 +854,7 @@ StandardRequests
             endi
             break
         case STRING
-            ;PrintString GET_STRING_DESCRIPTOR_STR
+            ;PrintStr GET_STRING_DESCRIPTOR_STR
             movf USB_BufferData+wValue, W, BANKED
             select
             case 0
@@ -917,7 +935,7 @@ StandardRequests
 
             call updateControlTxZeroBytes
         otherwise
-            PrintString SET_CONFIG_ERR_STR
+            PrintStr SET_CONFIG_ERR_STR
             bsf     USB_error_flags, 0, BANKED    ; set Request Error flag
         endi
         break
@@ -1003,14 +1021,14 @@ ProcessInToken
     banksel USB_USTAT
     movf  USB_USTAT, W, BANKED
     andlw 0x18        ; extract the EP bits
-    ;PrintString PROCESS_IN_TOKEN_STR
+    ;PrintStr PROCESS_IN_TOKEN_STR
     select
     case EP0
-        ;PrintString EP0InStr
+        ;PrintStr EP0InStr
         movf USB_dev_req, W, BANKED
         select
         case SET_ADDRESS
-            PrintString SET_DEVICE_ADDRESS_STR
+            PrintStr SET_DEVICE_ADDRESS_STR
             movf   USB_address_pending, W, BANKED
             movwf  UADDR, ACCESS
             select
@@ -1039,10 +1057,10 @@ ProcessInToken
         ends
         break
     case EP1
-        PrintString EP1InStr
+        PrintStr EP1InStr
 	break
     case EP2
-        PrintString EP2InStr
+        PrintStr EP2InStr
 	;Send something to the host over USB.
 	
 	
@@ -1081,7 +1099,7 @@ ProcessInToken
 
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ProcessOutToken
-    ;PrintString OUTTOK
+    ;PrintStr OUTTOK
     banksel  USB_USTAT
     movf     USB_USTAT, W, BANKED
     andlw    0x18        ; extract the EP bits
@@ -1095,12 +1113,12 @@ ProcessOutToken
         call updateControlTxZeroBytes
 	break
     case EP1
-        ; PrintString EP1OutStr
+        ; PrintStr EP1OutStr
         call copyPayloadToBufferData
         ; Receive data from the host.
 	; and copy it to the RS232.
 	
-        PrintData USB_BufferData
+        ;PrintData USB_BufferData
 
 	banksel BD1OBC
 	movlw   MAX_PACKET_SIZE
@@ -1253,7 +1271,7 @@ clearNonControlEndPoints:
     return
 
 InitUSB
-    PrintString USB_INITIALISED
+    PrintStr USB_INITIALISED
     clrf        UIE, ACCESS                ; USB Interrupt Enable register - Mask all USB interrupts
     clrf        UIR, ACCESS                ; USB Interrupt Status register - Clear all interrupt flags
     movlw       0x14                       ; UPUEN  = 1 On-chip pull-up on D+, so full speed.
@@ -1293,7 +1311,7 @@ Main
     bsf    INTCON, PEIE, ACCESS          ; Enables all unmasked peripheral interrupts.
     bcf    PIE1, TXIE ,  ACCESS          ; Disable transmission interrupts.
 
-    PrintString HELLO_WORLD
+    PrintStr HELLO_WORLD
     
     call        InitUSB           ; Initialize the USB registers and serial interface engine.
 
@@ -1302,7 +1320,7 @@ Main
         banksel  USB_USWSTAT
     until USB_USWSTAT, EQ, CONFIG_STATE  ; ...until the host configures the peripheral
     
-    PrintString PIC_CONFIGURED
+    PrintStr PIC_CONFIGURED
     
     bsf         PORTA, 0, ACCESS      ; set RA0 high
     banksel     COUNTER_L

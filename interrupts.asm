@@ -5,13 +5,8 @@
 
 
     global InterruptServiceRoutine
-    global RS232_PTRU
-    global RS232_PTRH
-    global RS232_PTRL
-    global SHADOW_RS232_PTRU
-    global SHADOW_RS232_PTRH
-    global SHADOW_RS232_PTRL
-    global PRINTDATA_OR_PROG
+     
+    extern RS232_ReadByteFromBuffer
 
 ACCESS_DATA  udata_acs
 PCLATH_TEMP  res 1
@@ -25,16 +20,8 @@ FSR2H_TEMP res 1
 FSR2L_TEMP res 1
 
 
-SHADOW_RS232_PTRU   res 1  ; The Macro PrintString will overwrite these without
-SHADOW_RS232_PTRH   res 1  ; checking if the printing is currently using the
-SHADOW_RS232_PTRL   res 1  ; variables below.  The function print
-                           ; will overwrite the variables below if they are
-                           ; not currently in use.
-RS232_PTRU          res 1  ; These store the current print head of the RS232 output.
-RS232_PTRH          res 1
-RS232_PTRL          res 1
-
-PRINTDATA_OR_PROG           res 1  ; 0x01 if Data, otherwise print from program memory
+RS232_BUFFER_CHAR   res 1  ; The Macro PrintString will overwrite these without
+ 
 
 
    
@@ -80,75 +67,26 @@ InterruptTransmitRS232Ready:
 
     btfss PIE1, TXIE, ACCESS ;skip if TXIE == 1 because transmission enabled.
     goto InterruptServiceEnd
-
-
-    ; Now need to restore the saved RS232 table pointers to the table
-
-    btfsc PRINTDATA_OR_PROG, 0, ACCESS   ; Check whether to send data from program 
-    goto SendRS232FromData               ; memory or from data?
-
-SendRS232FromProgram:
-    movf RS232_PTRU, W
-    movwf TBLPTRU, ACCESS
-
-    movf RS232_PTRH, W
-    movwf TBLPTRH, ACCESS
-
-    movf RS232_PTRL, W
-    movwf TBLPTRL, ACCESS
-
-    tblrd*+                 ; Read byte and increment pointer
-    movf TABLAT, W, ACCESS  ; Take the read byte from the latch.
-
-    addlw 0x00              ; Check for end of string \0 character
-    btfsc STATUS,Z, ACCESS  ; If zero bit is clear, skip the goto
-    goto InterruptRS232TxDone
-
-    movwf TXREG,ACCESS      ; Send the data
-
-    ; Now TABLAT holds the data and the TBLPTR pointer has been incremented
-    ; to the next address, so put the new address into the RS232 registers.
-
-    movf TBLPTRU, W
-    movwf RS232_PTRU, ACCESS
-
-    movf TBLPTRH, W
-    movwf RS232_PTRH, ACCESS
-
-    movf TBLPTRL, W
-    movwf RS232_PTRL, ACCESS
-    goto InterruptServiceEnd
-
-
+    
 SendRS232FromData:
-    movf RS232_PTRH, W
-    movwf FSR2H, ACCESS
-
-    movf RS232_PTRL, W
-    movwf FSR2L, ACCESS
-
-
-    movf POSTINC2, W    ; Read byte and increment pointer
-
-    addlw 0x00              ; Check for end of string \0 character
+    call  RS232_ReadByteFromBuffer
+    movwf RS232_BUFFER_CHAR, ACCESS
+    sublw 0xFF		; When the 0xFF byte is read stop transmission.
+    
     btfsc STATUS,Z, ACCESS  ; If zero bit is clear, skip the goto
-    goto InterruptRS232TxDone
-
+    goto  InterruptRS232TxDone
+    movf  RS232_BUFFER_CHAR, W, ACCESS
     movwf TXREG,ACCESS      ; Send the data
 
-    movf FSR2H, W
-    movwf RS232_PTRH, ACCESS
-
-    movf FSR2L, W
-    movwf RS232_PTRL, ACCESS
-
-    goto InterruptServiceEnd
+   goto InterruptServiceEnd
 
 InterruptRS232TxDone:
-    ; The entire string has been transmitted, so disable TXIE.
+    ; The read of the buffer returned 0xFF so
+    ; the entire buffer is empty, therefore disable TXIE.
     ; When the next string is sent TXIE will be enabled again.
 
-    bcf PIE1, TXIE,  ACCESS   ; Disable interrupts
+    bcf TXSTA, TXEN, ACCESS  ; Disable transmission.
+    bcf PIE1, TXIE,  ACCESS  ; Disable interrupts
 
 InterruptServiceEnd:
 
