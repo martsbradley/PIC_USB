@@ -71,12 +71,13 @@ InterruptTransmitRS232Ready:
 SendRS232FromData:
     call  RS232_ReadByteFromBuffer
     movwf RS232_BUFFER_CHAR, ACCESS
-    sublw 0xFF		; When the 0xFF byte is read stop transmission.
+    xorlw 0xFF          ;  0xFF xor char if char was FF then zero bit set. 
     
-    btfsc STATUS,Z, ACCESS  ; If zero bit is clear, skip the goto
+    btfsc STATUS, Z, ACCESS  ; If zero bit is clear, skip the goto
     goto  InterruptRS232TxDone
+    
     movf  RS232_BUFFER_CHAR, W, ACCESS
-    movwf TXREG,ACCESS      ; Send the data
+    movwf TXREG, ACCESS      ; Send the data
 
    goto InterruptServiceEnd
 
@@ -85,7 +86,7 @@ InterruptRS232TxDone:
     ; the entire buffer is empty, therefore disable TXIE.
     ; When the next string is sent TXIE will be enabled again.
 
-    bcf TXSTA, TXEN, ACCESS  ; Disable transmission.
+    ;bcf TXSTA, TXEN, ACCESS  ; Disable transmission.
     bcf PIE1, TXIE,  ACCESS  ; Disable interrupts
 
 InterruptServiceEnd:

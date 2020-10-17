@@ -67,7 +67,7 @@
 
     global RS232_RINGBUFFER, RS232_RINGBUFFER_HEAD, RS232_RINGBUFFER_TAIL
     global RS232_Temp_StrLen, RS232_Temp1, RS232_Temp2, RS232_Temp3
-    global RS232_Temp4, RS232_Temp5, RS232_Temp6, RS232_Temp7
+    global RS232_Temp4, RS232_Temp5, RS232_Temp6, RS232_Temp7,RS232_Temp8
 
 
     
@@ -84,6 +84,7 @@ RS232_Temp4           res 1
 RS232_Temp5           res 1
 RS232_Temp6           res 1
 RS232_Temp7           res 1
+RS232_Temp8           res 1
 
 USB_BufferDescriptor  res 4
 USB_BufferData        res 8

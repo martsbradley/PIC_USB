@@ -3,11 +3,11 @@
     #include rs232.inc
    
     global InitUsartComms, PrintStrFn
-    global RS232_RingBufferInit, RS232_ReadByteFromBuffer
+    global RS232_ReadByteFromBuffer
     
     extern RS232_RINGBUFFER, RS232_RINGBUFFER_HEAD, RS232_RINGBUFFER_TAIL
     extern RS232_Temp_StrLen, RS232_Temp1, RS232_Temp2, RS232_Temp3
-    extern RS232_Temp4, RS232_Temp5, RS232_Temp6, RS232_Temp7
+    extern RS232_Temp4, RS232_Temp5, RS232_Temp6, RS232_Temp7,RS232_Temp8
 
     
     
@@ -45,6 +45,7 @@ RS232_CODE  code
   
   
 InitUsartComms:                 ; Setup the usart hardware
+    call RS232_RingBufferInit
     bsf   TRISC, 7, ACCESS
     bsf   TRISC, 6, ACCESS
     banksel TXSTA
@@ -56,6 +57,8 @@ InitUsartComms:                 ; Setup the usart hardware
     banksel RCSTA
     movlw 0x90                  ; DIVIDER ((int)(FOSC/(16UL * BAUD) -1))
     movwf RCSTA,ACCESS          ; HIGH_SPEED 1
+    
+    bsf TXSTA, TXEN, ACCESS  ; Enable transmission, causes an interrupt.
     return
 
    
@@ -203,7 +206,7 @@ RS232_ReadByteFromBuffer:
    movwf FSR2L, ACCESS    
         
    movf POSTINC2, W, ACCESS       ; Read character into W
-   movwf RS232_Temp3, BANKED    ; Keep the byte to be written.
+   movwf RS232_Temp8, BANKED    ; Keep the byte to be written.
    
    movlw high RS232_RINGBUFFER  ; Point again to the head of the RingBuffer
    movwf FSR2H, ACCESS
@@ -220,7 +223,7 @@ RS232_ReadByteFromBuffer:
    
 
    
-   movf RS232_Temp3, W, BANKED  ; The byte to be written -> W
+   movf RS232_Temp8, W, BANKED  ; The byte to be written -> W
    return
     
     
@@ -253,7 +256,7 @@ PrintStrFn:
 
     bcf PIE1, TXIE,  ACCESS   ; Disable interrupts as we want the ring buffer
 			      ; not to change while updating it.      
-    
+			      
     call RS232_RingBufferBytesFree_FN
     ; Loosing one byte because using <, should be <=
     cpfslt RS232_Temp4, BANKED; skip next when String length < Bytes Free
@@ -273,9 +276,6 @@ RS232_AddNextByte:
     goto RS232_AddNextByte
 
     ; Update the RS232 to send the details from the buffer.
-    
-    bsf TXSTA, TXEN, ACCESS  ; Enable transmission, causes an interrupt.
-    
     
 PrintStrFnDone:   
     bsf PIE1, TXIE,  ACCESS   ; Enable interrupts again
