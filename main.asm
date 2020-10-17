@@ -160,18 +160,16 @@ IDLE_CONDITION:
 STALL_HANDSHAKE_STR:
     da "Stall\r\n",0
 USB_RESET_STR:
-    da "RST\r\n",0
+    da "Reset\r\n",0
 GET_DEVICE_DESCRIPTOR_STR:
     da "Get_DeviceDescriptor\r\n",0
 GET_CONFIG_DESCRIPTOR_STR:
-    da "G_CD\r\n",0
+    da "Get_Config Desc\r\n",0
 GET_STRING_DESCRIPTOR_STR:
     da "G_SD\r\n",0
 SET_DEVICE_ADDRESS_STR:
-    da "S_AD\r\n",0
+    da "Set Address\r\n",0
 
-MARTY:
-    da "MrY\r\n",0
 
 USBSTUFF    code
 getDescriptorByte
