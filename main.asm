@@ -83,25 +83,21 @@ USB_USWSTAT         res    1 ; Current state POWERED_STATE|DEFAULT_STATE|ADDRESS
 COUNTER_L           res    1
 COUNTER_H           res    1
 
-	   
-RS232_RINGBUFFER      res 64
+
+#define    SIZE       0x20 ; 
+RS232_RINGBUFFER      res SIZE		;  this should be aligned on a byte.
 RS232_RINGBUFFER_HEAD res 1
 RS232_RINGBUFFER_TAIL res 1
+RS232_Temp_StrLen           res 1
 RS232_Temp1           res 1
 RS232_Temp2           res 1
 RS232_Temp3           res 1
 RS232_Temp4           res 1
 	   
-#define    SIZE       0x10 ; 
 	   
-	
-	   
-    extern RS232_PTRU
-    extern RS232_PTRH
-    extern RS232_PTRL
-	   
-	   
-	   
+RS232_Temp5           res 1
+RS232_Temp6           res 1
+RS232_Temp7           res 1
 	   
 	   
 	   
@@ -124,7 +120,14 @@ LAUNCH_PROGRAM code     0x00
 MAIN_PROGRAM code
 USB_INITIALISED:
     da "USB_init_called\r\n",0
-    
+;       123456789abcdef 1 2  3  (18 characters long)
+
+EASY_STR:
+    da "abcABC\r\n",0
+;       123456 1 2  3  (9 characters long)
+MB_STR:
+    da "MPB\r\n",0
+;       123 1 2  3  (6 characters long)
     
 ;Return the number of stored bytes in W
 RS232_RingBufferInit:
@@ -147,7 +150,7 @@ RS232_RingBufferInit:
 ;===============================================================================
 ;Return the number of stored bytes in W
 RS232_RingBufferBytesStored_Fn:
-    movf RS232_RINGBUFFER_HEAD, W
+    movf RS232_RINGBUFFER_HEAD, W, BANKED
     cpfseq RS232_RINGBUFFER_TAIL, BANKED; skip if equal
     goto RS232_RingBufferBytesNotEmpty
     goto RS232_RingBufferBytesEmpty
@@ -159,14 +162,14 @@ RS232_RingBufferBytesNotEmpty:
 RS232_RingBufferBytesEmpty:
 RS232_RingBufferTail_GT_HEAD:
     ; size = tail - head;
-    movf  RS232_RINGBUFFER_HEAD, BANKED
-    subwf RS232_RINGBUFFER_TAIL,  W, BANKED 
+    movf  RS232_RINGBUFFER_HEAD, W, BANKED
+    subwf RS232_RINGBUFFER_TAIL, W, BANKED 
     return
 
 RS232_RingBufferTail_LT_HEAD:
     ; size = (SIZE - head) + tail;
     
-    movf RS232_RINGBUFFER_HEAD, W
+    movf RS232_RINGBUFFER_HEAD, W, BANKED
     SUBLW SIZE		    ; (SIZE - HEAD) -> w
     addwf RS232_RINGBUFFER_TAIL,  W, BANKED    
     
@@ -190,21 +193,39 @@ RS232_RingBufferBytesFree_FN:
    subwf RS232_Temp1, W, BANKED
    
    return
+;===============================================================================
+BackupTablePointer:   
+    movf TBLPTRU, W, ACCESS 
+    movwf RS232_Temp5, BANKED
+
+    movf TBLPTRH, W, ACCESS 
+    movwf RS232_Temp6, BANKED
+
+    movf TBLPTRL, W, ACCESS 
+    movwf RS232_Temp7, BANKED
+    return
+;===============================================================================
+RestoreTablePointer:   
+    movf RS232_Temp5, W, BANKED 
+    movwf TBLPTRU, ACCESS
     
+    movf RS232_Temp6, W, BANKED 
+    movwf TBLPTRH, ACCESS
+
+    movf RS232_Temp7, W, BANKED 
+    movwf TBLPTRL, ACCESS   
     
+    return
 ;===============================================================================
 
 StringLengthFN:
-    movf RS232_PTRU, W       ; this is table/program memory.
-    movwf TBLPTRU, ACCESS    ; need same for ram.
-
-    movf RS232_PTRH, W
-    movwf TBLPTRH, ACCESS
-
-    movf RS232_PTRL, W
-    movwf TBLPTRL, ACCESS
-
-    clrf RS232_Temp2, ACCESS      ; Initialize counter to 0
+    
+;    This function moves the TBLPTR so firstly store this PTR into
+;    RS232_Temp5/6/7 and then restore it before returning.
+    
+    call BackupTablePointer
+    
+    clrf RS232_Temp_StrLen, BANKED      ; Initialize counter to 0
 StringLengthFNNext:
     tblrd*+                 ; Read byte and increment pointer
     movf TABLAT, W, ACCESS  ; Take the read byte from the latch.
@@ -212,61 +233,36 @@ StringLengthFNNext:
     addlw 0x00              ; Check for end of string \0 character
     btfsc STATUS,Z, ACCESS  ; If zero bit is clear, skip the goto
     goto StringLengthDone
-    incf RS232_Temp2, F, ACCESS
+    incf RS232_Temp_StrLen, F, BANKED
     goto StringLengthFNNext
 
 StringLengthDone:
-    incf RS232_Temp2, F, ACCESS   ; Increment once for the \0
-    movf RS232_Temp2, W
+    call RestoreTablePointer
+    incf RS232_Temp_StrLen, F, BANKED   ; Increment once for the \0
+    movf RS232_Temp_StrLen, W, BANKED
+    
     return 
     
-    
+;===============================================================================
+; Move byte in w onto the buffer    
 RS232_AddByteToBuffer:
-   ; Move byte in w onto the buffer, already know there is space  
-   ; for it.
-
-   movwf RS232_Temp3, ACCESS
+   movwf RS232_Temp3, BANKED    ; Keep the byte to be written.
  
-   movlw high RS232_RINGBUFFER
-   movwf FSR2L, ACCESS
+   movlw high RS232_RINGBUFFER  ; Point into the RingBuffer
+   movwf FSR2H, ACCESS
    movlw low RS232_RINGBUFFER
    addwf RS232_RINGBUFFER_TAIL, W
-   movwf FSR2L, ACCESS           ;Now pointing at correct buffer location
+   movwf FSR2L, ACCESS           
 
-   movwf RS232_Temp3, ACCESS
-   movwf POSTINC0, ACCESS       ; puts chararacter onto the buffer
-   ;incrememnt the tail of he buffer... wrapping around ..
-   incf  RS232_RINGBUFFER_TAIL, F, ACCESS
-   movlw SIZE -1
-   andwf RS232_RINGBUFFER_TAIL, F, ACCESS
+   movf RS232_Temp3, W, BANKED  ; The byte to be written -> W
+   movwf POSTINC2, ACCESS       ; Write character onto the buffer
+
+   incf  RS232_RINGBUFFER_TAIL, F, BANKED 
+   movlw SIZE - 1
+   andwf RS232_RINGBUFFER_TAIL, F, BANKED  ;  Wrap around 
+   movf RS232_Temp3, W, BANKED ; Put the byte back into W for test for \0
    return
 
-    movf POSTINC2, W    ; Read byte and increment pointer
-
-    addlw 0x00              ; Check for end of string \0 character
-    btfsc STATUS,Z, ACCESS  ; If zero bit is clear, skip the goto
-    goto InterruptRS232TxDone
-
-    movwf TXREG,ACCESS      ; Send the data
-
-    movf FSR2H, W
-    movwf RS232_PTRH, ACCESS
-
-    movf FSR2L, W
-    movwf RS232_PTRL, ACCESS
-InterruptRS232TxDone:
-InterruptServiceEnd:		;///////????????//
-    goto InterruptServiceEnd
-;===============================================================================    
-PrintStrinT macro string
-    movlw upper string
-    movwf TBLPTRU, ACCESS 
-    movlw high string
-    movwf TBLPTRH, ACCESS
-    movlw low  string
-    movwf TBLPTRL, ACCESS
-    call PrintStrFn
-	endm
 
 ;===============================================================================
 
@@ -277,38 +273,36 @@ PrintStrFn:
 
     call RS232_RingBufferBytesFree_FN
 
-    cpfsgt RS232_Temp4, BANKED; skip next when String length < Bytes Free 
-    return              ; just return don't print string.
-
-    ;The string needs put on the buffer.
+    cpfslt RS232_Temp4, BANKED; skip next when String length < Bytes Free
+    return              ; Don't print string.
 
 RS232_AddNextByte:
     tblrd*+                 ; Read byte and increment pointer
     movf TABLAT, W, ACCESS  ; Take the read byte from the latch.
 
-    movwf RS232_Temp4, BANKED
-    
     call RS232_AddByteToBuffer
 
-    ;if zero was just added then 
-    ;raise the interrupt enable and return.
+    ; If zero was just added then 
+    ; raise the interrupt enable and return.
 
     addlw 0x00              ; Check for end of string \0 character
     btfss STATUS,Z, ACCESS  ; If zero bit is set stop adding bytes
     goto RS232_AddNextByte
-    ; enable interrupts.
+
+    ; Update the RS232 to send the details from the buffer.
+    return
 
 ;===============================================================================
+PrintStrinT macro string
+    movlw upper string
+    movwf TBLPTRU, ACCESS 
+    movlw high string
+    movwf TBLPTRH, ACCESS
+    movlw low  string
+    movwf TBLPTRL, ACCESS
+    call PrintStrFn
+	endm
 
-
-    
-    
-    
-    
-    
-    
-
-;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++    
 Main
     clrf        PORTA,  ACCESS
     movlw       0x0F
@@ -322,16 +316,20 @@ Main
     bsf    INTCON, PEIE, ACCESS          ; Enables all unmasked peripheral interrupts.
     bcf    PIE1, TXIE ,  ACCESS          ; Disable transmission interrupts.
 
-    PrintString USB_INITIALISED
+;    PrintString USB_INITIALISED
     
     
-
+    banksel COUNTER_L
+    call RS232_RingBufferInit
+    
     repeat
-        banksel COUNTER_L
-	call RS232_RingBufferInit
-	call RS232_RingBufferBytesStored_Fn
-	call RS232_RingBufferBytesFree_FN
+;    	call RS232_RingBufferBytesStored_Fn
+;	call RS232_RingBufferBytesFree_FN
 	
+	PrintStrinT EASY_STR
+	PrintStrinT MB_STR
+	
+ 
 
 	
 	
@@ -370,3 +368,12 @@ Main
     ; SUBLW kk	   Subtract W from literal (kk - WREG) ? WREG
     ; SUBWF f,d,a  Subtract WREG from f	   (f ? WREG) ? dest
     ; ADDWF f,d    Add w AND f             (WREG + f) ? dest 
+    
+    ; CPFSGT f,a   Compare f with WREG,     skip if f > WREG
+
+    
+    
+;    FF6  TBLPTR
+;FD9  FSR2
+;
+;page 68 registers.
