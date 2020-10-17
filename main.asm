@@ -123,22 +123,23 @@ PROCESS_ERR
     da "er\r\n",0
 PROCESS_T
     da "t",0
+    
 PROCESS_SETUP_TOKEN_STR:
-    da "s",0
+    da "s\r\n",0
 PROCESS_OUT_TOKEN_STR:
-    da "x",0
+    da "x\r\n",0
 PROCESS_IN_TOKEN_STR:
-    da "i",0
+    da "i\r\n",0
 EP0InStr:
-    da "z",0
+    da "z\r\n",0
 EP1InStr:
-    da "Z",0
+    da "Z\r\n",0
 EP2InStr:
     da "EP2InStr\r\n",0
 EP1OutStr:
-    da "T",0
+    da "T\r\n",0
 SET_CONFIG_STR:
-    da "q",0
+    da "q\r\n",0
 HELLO_WORLD:
     da "Hi\r\n",0
 POWERED_STATE_STR:
@@ -150,7 +151,7 @@ DEFAULT_STATE_STR:
 USB_INITIALISED:
     da "USB_init_called\r\n",0
 SET_CONFIG_ERR_STR:
-    da "e",0
+    da "e\r\n",0
 PIC_CONFIGURED:
     da "Configured\r\n",0
 IDLE_CONDITION:
@@ -160,7 +161,7 @@ STALL_HANDSHAKE_STR:
 USB_RESET_STR:
     da "RST\r\n",0
 GET_DEVICE_DESCRIPTOR_STR:
-    da "G_DS\r\n",0
+    da "Get_DeviceDescriptor\r\n",0
 GET_CONFIG_DESCRIPTOR_STR:
     da "G_CD\r\n",0
 GET_STRING_DESCRIPTOR_STR:
