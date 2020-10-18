@@ -160,7 +160,13 @@ int interruptTransferOut(libusb_device_handle* dev_handle, unsigned char *data) 
 }
 
 void printDetails(libusb_context *ctx) {
-    libusb_set_debug(ctx, 3); //set verbosity level to 3, as suggested in the documentation
+    libusb_set_option(ctx, LIBUSB_OPTION_LOG_LEVEL, LIBUSB_LOG_LEVEL_DEBUG);
+                           //LIBUSB_LOG_LEVEL_NONE = 0
+                           //LIBUSB_LOG_LEVEL_ERROR = 1
+                           //LIBUSB_LOG_LEVEL_WARNING = 2
+                           //LIBUSB_LOG_LEVEL_INFO = 3
+                           //LIBUSB_LOG_LEVEL_DEBUG = 4;
+    
     libusb_device **devs; //pointer to pointer of device, used to retrieve a list of devices
 
     ssize_t cnt = libusb_get_device_list(ctx, &devs); //get the list of devices
