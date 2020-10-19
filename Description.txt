@@ -1,0 +1,26 @@
+
+How it works.
+=============
+After a transmission is completed the interrupt flag TRNIF is asserted.
+The USTAT register has fields for the endpoint and the direction 
+of the communication.   With that information the starting address
+of the relevant Buffer Descriptor is located from the RAM memory
+starting at 0x400.  
+
+Those four bytes are pulled copied into the GPR (General Purpose
+Register) USB_BufferDescriptor.  The value of USTAT is saved
+into USB_USTAT.
+
+The first byte of the BufferDescriptor is the Buffers STAT register.
+When the SIE (Serial Interface Engine) has just populated the STAT
+register the bits have the PID bits.  These PID bits tell if
+the packet is a TOKEN_SETUP/TOKEN_IN/TOKEN_OUT.
+
+TOKEN_IN, TOKEN_OUT instruct the device that the host wants data or 
+wants to send data to the device.
+
+TOKEN_SETUP are commands to enumerate the device and can cause
+input and output.
+
+
+https://www.beyondlogic.org/usbnutshell/usb4.shtml

@@ -2,3 +2,8 @@
 dist/
 build/
 *.exe
+eclipse_workspace
+.classpath
+.project
+.settings/
+target/
