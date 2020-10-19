@@ -1087,12 +1087,18 @@ ProcessInToken
         movwf   POSTINC0
 	
 	
-	
 	banksel BD2IBC
 	movlw   8
 	movwf   BD2IBC, BANKED
-	movlw   0x00
-	movwf   BD2IST, BANKED
+	
+	movlw     0x40		       ; 0100 0000 DataToggleSync Bit
+	xorwf     BD2IST, W, BANKED    ; Toggle the DATA01 bit
+	andlw     0x40                 ; clear the PIDs bits
+	iorlw     0x88                 ; set UOWN and DTS bits
+	movwf     BD2IST, BANKED
+	
+	
+	
 	break
     ends
     return
@@ -1244,7 +1250,7 @@ setupEndpoint2:
     movwf   BD2IAL, BANKED
     movlw   high (USB_Buffer+ 4*MAX_PACKET_SIZE)    ; EP1 OUT gets a buffer...
     movwf   BD2IAH, BANKED
-    movlw   0x80                  ;CPU owns buffer, no syn
+    movlw   0x88                  ;CPU owns buffer, with syn
     movwf   BD2IST, BANKED        ; synchronization byte needed?
 
     movlw   ENDPT_IN_ONLY        ; EP1 is gets output from host
