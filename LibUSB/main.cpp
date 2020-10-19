@@ -2,6 +2,10 @@
 #include <libusb.h>
 #include <usb.h>
 #include <unistd.h>
+#include <iostream>
+#include <string>
+#include <string.h>
+#include <math.h>
 
 using namespace std;
 
@@ -130,7 +134,7 @@ int interruptTransferOut(libusb_device_handle* dev_handle, unsigned char *data) 
                                            &transferred,
                                            timeout);
     if (result == 0) {
-        cout << "success: Transferred bytes " << transferred << endl;
+        //cout << "success: Transferred bytes " << transferred << endl;
     } 
     else {
         switch(result) {
@@ -332,10 +336,38 @@ int main()
         snprintf((char*)data, 8, "M___%c\r\n",'z');
         result = interruptTransferOut(dev_handle,data);
 
-        usleep(3000);
-        usleep(3000);
-        usleep(3000);
-        usleep(3000);
+
+
+        //read input chars into a buffer
+        //send the buffer to the USB
+        //
+
+
+        string mystr;
+        const char *newLine = "\r\n";
+        cout << "Send some data, ctrl-c to finish:" << endl;
+        while (getline (cin, mystr) ) {
+            cout << mystr << endl;
+
+            while (mystr.length() > 0) {
+
+                memset(&data[0], 0, 8);
+
+                memcpy(&data[0],mystr.c_str(), 8);
+
+                int length = mystr.length();
+                mystr.erase(0, min(8, length));
+
+                result = interruptTransferOut(dev_handle,data);
+            }
+
+
+            memset(&data[0],0,8);
+            strncpy((char*)&data[0], newLine, 2);
+            
+            result = interruptTransferOut(dev_handle,data);
+
+        }
 
         cout << "Read one ..." << endl;
         interruptInToComputerTransfer(dev_handle);
