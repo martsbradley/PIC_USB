@@ -160,7 +160,6 @@ int interruptTransferOut(libusb_device_handle* dev_handle, unsigned char *data) 
 }
 
 void printDetails(libusb_context *ctx) {
-    libusb_set_debug(ctx, 3); //set verbosity level to 3, as suggested in the documentation
     libusb_device **devs; //pointer to pointer of device, used to retrieve a list of devices
 
     ssize_t cnt = libusb_get_device_list(ctx, &devs); //get the list of devices
@@ -229,6 +228,46 @@ void printdev(libusb_device *dev)
 
     libusb_free_config_descriptor(config);
 }
+
+void interruptInToComputerTransfer(libusb_device_handle* dev_handle) {
+    unsigned char *data = new unsigned char[10];      //data to write
+    data[0]='m';
+    data[1]='a';
+    data[2]='r';
+    data[3]='t';
+    data[4]='s';
+    data[5]='\r';
+    data[6]='\n';
+    data[7]='\0'; 
+    data[8]='\0'; 
+    data[9]='\0'; 
+
+    unsigned char endpointId = 2 |LIBUSB_ENDPOINT_IN;
+    unsigned int timeout = 500;
+    int transferred = 0;
+
+    int result = libusb_interrupt_transfer(dev_handle,
+                                       endpointId,
+                                       data,
+                                       8,
+                                       &transferred,
+                                       timeout);
+    if (result == 0) {
+        cout << "Transferred bytes: "  << transferred << endl;
+        cout <<                 data[0] << endl;
+        cout <<                 data[1] << endl;
+        cout <<                 data[2] << endl;
+        cout <<                 data[3] << endl;
+        cout <<                 data[4] << endl;
+        cout <<                 data[5] << endl;
+        cout <<                 data[6] << endl;
+        cout <<                 data[7] << endl;
+    }
+    else {
+        showError(result);
+    }
+}
+
 int main() 
 {
     libusb_context *ctx = NULL; //a libusb session
@@ -238,7 +277,9 @@ int main()
                 return 1;
     }
 
-    printDetails(ctx);
+    libusb_set_debug(ctx, 3); //set verbosity level to 3, as suggested in the documentation
+
+    //printDetails(ctx);
 
     libusb_device_handle* dev_handle = getDeviceHandle(ctx);
 
@@ -278,30 +319,32 @@ int main()
         data[2] = '\0';
         data[3] = '\0';
 
-        usleep(3000);
+      //  usleep(3000);
 
-        unsigned char endpointId = 2 |LIBUSB_ENDPOINT_IN;
-        result = libusb_interrupt_transfer(dev_handle,
-                                           endpointId,
-                                           data,
-                                           8,
-                                           &transferred,
-                                           timeout);
-        if (result == 0) {
-            cout << "Transferred bytes: "  << transferred << endl;
-            cout <<                 data[0] << endl;
-            cout <<                 data[1] << endl;
-            cout <<                 data[2] << endl;
-            cout <<                 data[3] << endl;
-            cout <<                 data[4] << endl;
-            cout <<                 data[5] << endl;
-            cout <<                 data[6] << endl;
-            cout <<                 data[7] << endl;
-        }
-        else {
-            showError(result);
-        }
-
+      //unsigned char endpointId = 2 |LIBUSB_ENDPOINT_IN;
+      //result = libusb_interrupt_transfer(dev_handle,
+      //                                   endpointId,
+      //                                   data,
+      //                                   8,
+      //                                   &transferred,
+      //                                   timeout);
+      //if (result == 0) {
+      //    cout << "Transferred bytes: "  << transferred << endl;
+      //    cout <<                 data[0] << endl;
+      //    cout <<                 data[1] << endl;
+      //    cout <<                 data[2] << endl;
+      //    cout <<                 data[3] << endl;
+      //    cout <<                 data[4] << endl;
+      //    cout <<                 data[5] << endl;
+      //    cout <<                 data[6] << endl;
+      //    cout <<                 data[7] << endl;
+      //}
+      //else {
+      //    showError(result);
+      //}
+    interruptInToComputerTransfer(dev_handle);
+    cout << " Try another read..." << endl;
+    interruptInToComputerTransfer(dev_handle);
 
 
 

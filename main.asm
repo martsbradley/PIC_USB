@@ -92,7 +92,7 @@ USB_error_flags       res 1  ; Was there an error.
 USB_curr_config       res 1  ; Holds the value of the current configuration.
 USB_device_status     res 1  ; Byte, sent to host request status
 USB_dev_req           res 1
-USB_address_pending   res 1
+USB_address_pending   res 1  ; hold address until it is confirmed.
 USB_desc_ptr          res 1  ; address of descriptor
 USB_bytes_left        res 1
 USB_loop_index        res 1
@@ -122,23 +122,12 @@ OUTTOK:
     da "OUTK\r\n",0
 PROCESS_ERR
     da "er\r\n",0
-PROCESS_T
-    da "t",0
-    
-PROCESS_SETUP_TOKEN_STR:
-    da "s\r\n",0
-PROCESS_OUT_TOKEN_STR:
-    da "x\r\n",0
-PROCESS_IN_TOKEN_STR:
-    da "i\r\n",0
 EP0InStr:
-    da "z\r\n",0
-EP1InStr:
-    da "Z\r\n",0
+    da "EP0I\r\n",0
 EP2InStr:
     da "EP2InStr\r\n",0
 EP1OutStr:
-    da "T\r\n",0
+    da "EP1O\r\n",0
 SET_CONFIG_STR:
     da "q\r\n",0
 HELLO_WORLD:
@@ -162,13 +151,16 @@ STALL_HANDSHAKE_STR:
 USB_RESET_STR:
     da "Reset\r\n",0
 GET_DEVICE_DESCRIPTOR_STR:
-    da "Get_DeviceDescriptor\r\n",0
+    da "Get Dev Desc\r\n",0
 GET_CONFIG_DESCRIPTOR_STR:
-    da "Get_Config Desc\r\n",0
+    da "Get Cfg Str\r\n",0
 GET_STRING_DESCRIPTOR_STR:
-    da "G_SD\r\n",0
+    da "Get Str Des\r\n",0
+
+REQ_SET_DEVICE_ADDRESS_STR:
+    da "Request Set Dev Addr\r\n",0
 SET_DEVICE_ADDRESS_STR:
-    da "Set Address\r\n",0
+    da "Confirm Dev Addr\r\n",0
 
 
 USBSTUFF    code
@@ -467,7 +459,6 @@ ServiceUSB
 #endif
         clrf    USB_error_flags, BANKED    ; clear USB error flags
 
-        ;PrintStr PROCESS_T
 
         movf    USB_BufferDescriptor, W, BANKED
                                  ; The PID is presented by the SIE in the BDnSTAT
@@ -475,15 +466,12 @@ ServiceUSB
 
         select
         case TOKEN_SETUP
-            ;PrintStr PROCESS_SETUP_TOKEN_STR
             call        ProcessSetupToken
             break
         case TOKEN_IN
-            ;PrintStr PROCESS_IN_TOKEN_STR
             call        ProcessInToken
             break
         case TOKEN_OUT
-            ;PrintStr PROCESS_OUT_TOKEN_STR
             call        ProcessOutToken
             break
         ends
@@ -808,7 +796,7 @@ StandardRequests
         ifset USB_BufferData+wValue, 7, BANKED        ; if new device address is illegal, send Request Error
             bsf USB_error_flags, 0, BANKED    ; set Request Error flag
         otherwise
-            ;PrintStr SET_DEVICE_ADDRESS_STR
+            PrintStr REQ_SET_DEVICE_ADDRESS_STR
             movlw   SET_ADDRESS
             movwf   USB_dev_req, BANKED           ; processing a set address request
             movf    USB_BufferData+wValue, W, BANKED
@@ -854,7 +842,7 @@ StandardRequests
             endi
             break
         case STRING
-            ;PrintStr GET_STRING_DESCRIPTOR_STR
+            PrintStr GET_STRING_DESCRIPTOR_STR
             movf USB_BufferData+wValue, W, BANKED
             select
             case 0
@@ -1021,10 +1009,10 @@ ProcessInToken
     banksel USB_USTAT
     movf  USB_USTAT, W, BANKED
     andlw 0x18        ; extract the EP bits
-    ;PrintStr PROCESS_IN_TOKEN_STR
+
     select
     case EP0
-        ;PrintStr EP0InStr
+        PrintStr EP0InStr
         movf USB_dev_req, W, BANKED
         select
         case SET_ADDRESS
@@ -1057,7 +1045,6 @@ ProcessInToken
         ends
         break
     case EP1
-        PrintStr EP1InStr
 	break
     case EP2
         PrintStr EP2InStr
@@ -1119,7 +1106,7 @@ ProcessOutToken
         call updateControlTxZeroBytes
 	break
     case EP1
-        ; PrintStr EP1OutStr
+        PrintStr EP1OutStr
         call copyPayloadToBufferData
         ; Receive data from the host.
 	; and copy it to the RS232.
