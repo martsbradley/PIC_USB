@@ -301,7 +301,7 @@ int main()
 
         snprintf((char*)data, 8, "M___%d\r\n",1);
         result = interruptTransferOut(dev_handle,data);
-        snprintf((char*)data, 8, "M__%d\r\n",2);
+        snprintf((char*)data, 8, "M___%d\r\n",2);
         result = interruptTransferOut(dev_handle,data);
         snprintf((char*)data, 8, "M___%d\r\n",3);
         result = interruptTransferOut(dev_handle,data);
@@ -315,6 +315,19 @@ int main()
         result = interruptTransferOut(dev_handle,data);
         snprintf((char*)data, 8, "M___%d\r\n",8);
         result = interruptTransferOut(dev_handle,data);
+        snprintf((char*)data, 8, "M___%d\r\n",9);
+        result = interruptTransferOut(dev_handle,data);
+        snprintf((char*)data, 8, "M___%c\r\n",'x');
+        result = interruptTransferOut(dev_handle,data);
+        snprintf((char*)data, 8, "M___%c\r\n",'y');
+        result = interruptTransferOut(dev_handle,data);
+        snprintf((char*)data, 8, "M___%c\r\n",'z');
+        result = interruptTransferOut(dev_handle,data);
+
+        usleep(3000);
+        usleep(3000);
+        usleep(3000);
+        usleep(3000);
 
         cout << "Read one ..." << endl;
         interruptInToComputerTransfer(dev_handle);

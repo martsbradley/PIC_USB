@@ -1083,6 +1083,7 @@ ProcessInToken
     return
 
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+;	    Receive data from the Host.
 ProcessOutToken
     banksel  USB_USTAT
     movf     USB_USTAT, W, BANKED
@@ -1097,11 +1098,6 @@ ProcessOutToken
         call updateControlTxZeroBytes
 	break
     case EP1
-        ;PrintStr EP1OutStr
-
-	
-        
-	
         ; Receive data from the host and send it out on RS232.
 	call copyPayloadToBufferData
 	banksel USB_BufferData
@@ -1114,7 +1110,7 @@ ProcessOutToken
 ;	movlw   0x80   ;  DISABLED SYNCHRONIATION DATA0/DATA1 ETC.
 ;	movwf   BD1OST, BANKED
 	
-	
+	movlw     0x40		       ; 0100 0000 DataToggleSync Bit
 	xorwf     BD1OST, W, BANKED    ; Toggle the DATA01 bit
 	andlw     0x40                 ; clear the PIDs bits
 	iorlw     0x88                 ; set UOWN and DTS bits
