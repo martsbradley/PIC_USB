@@ -61,7 +61,7 @@
 
     
     
-    extern PrintStrFn
+    extern PrintStrFn, PrintDataFn
     extern InitUsartComms, Delay
     extern InterruptServiceRoutine
 
@@ -118,16 +118,15 @@ LAUNCH_PROGRAM code     0x00
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 MAIN_PROGRAM code
-OUTTOK:
-    da "OUTK\r\n",0
-PROCESS_ERR
+
+PROCESS_ERR:
     da "er\r\n",0
 EP0InStr:
-    da "EP0I\r\n",0
+    da "EP0i\r\n",0
 EP2InStr:
-    da "EP2InStr\r\n",0
+    da "EP2i\r\n",0
 EP1OutStr:
-    da "EP1O\r\n",0
+    da "EP1o\r\n",0
 SET_CONFIG_STR:
     da "q\r\n",0
 HELLO_WORLD:
@@ -394,13 +393,6 @@ ServiceUSB
         movwf   BD0IAH, BANKED        ; ...set up its address
         movlw   0x08                  ; clear UOWN bit (MCU can write)
         movwf   BD0IST, BANKED
-
-
-
-
-
-
-
 
         clrf    UADDR, ACCESS         ; set USB Address to 0
         clrf    UIR, ACCESS           ; clear all the USB interrupt flags
@@ -1092,7 +1084,6 @@ ProcessInToken
 
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ProcessOutToken
-    ;PrintStr OUTTOK
     banksel  USB_USTAT
     movf     USB_USTAT, W, BANKED
     andlw    0x18        ; extract the EP bits
@@ -1106,18 +1097,30 @@ ProcessOutToken
         call updateControlTxZeroBytes
 	break
     case EP1
-        PrintStr EP1OutStr
-        call copyPayloadToBufferData
-        ; Receive data from the host.
-	; and copy it to the RS232.
-	
-        ;PrintData USB_BufferData
+        ;PrintStr EP1OutStr
 
+	
+        
+	
+        ; Receive data from the host and send it out on RS232.
+	call copyPayloadToBufferData
+	banksel USB_BufferData
+        PrintData USB_BufferData
+	
 	banksel BD1OBC
 	movlw   MAX_PACKET_SIZE
 	movwf   BD1OBC, BANKED
-	movlw   0x80   ;  DISABLED SYNCHRONIATION DATA0/DATA1 ETC.
-	movwf   BD1OST, BANKED
+	
+;	movlw   0x80   ;  DISABLED SYNCHRONIATION DATA0/DATA1 ETC.
+;	movwf   BD1OST, BANKED
+	
+	
+	xorwf     BD1OST, W, BANKED    ; Toggle the DATA01 bit
+	andlw     0x40                 ; clear the PIDs bits
+	iorlw     0x88                 ; set UOWN and DTS bits
+	movwf     BD1OST, BANKED
+	
+	
 	break
     case EP2
 	break
@@ -1210,9 +1213,13 @@ copyPayloadToBufferData:
     movwf    USB_BufferData+6, BANKED  ; Move received bytes to USB_BufferData
     movf     POSTINC0, W
     movwf    USB_BufferData+7, BANKED  ; Move received bytes to USB_BufferData
+    return
+    
+
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 setupEndpoint1:        
     banksel BD1OBC
+
     movlw   MAX_PACKET_SIZE       ; 8 bytes lowest packet size for low and high speed.
     movwf   BD1OBC, BANKED
     movlw   low (USB_Buffer+  2*MAX_PACKET_SIZE)    ; EP1 OUT gets a buffer...
@@ -1221,10 +1228,11 @@ setupEndpoint1:
     movwf   BD1OAH, BANKED
     movlw   0xC8                  ; set UOWN bit Data1 Data synchronization enabled.
     movlw   0x88                  ; set UOWN bit (SIE can write)
-    movwf   BD1OST, BANKED        ; synchronization byte needed?
+    movwf   BD1OST, BANKED        ; synchronization byte enabled.
 
     movlw   ENDPT_OUT_ONLY        ; EP1 is gets output from host
     movwf   UEP1, ACCESS          ; 
+    
     return
     
     
@@ -1237,10 +1245,10 @@ setupEndpoint2:
     movwf   BD2IAL, BANKED
     movlw   high (USB_Buffer+ 4*MAX_PACKET_SIZE)    ; EP1 OUT gets a buffer...
     movwf   BD2IAH, BANKED
-    movlw   0x88                  ;CPU owns buffer, with syn
-    movwf   BD2IST, BANKED        ; synchronization byte needed?
+    movlw   0x88                  ; Synchronization enabled.
+    movwf   BD2IST, BANKED        ; 
 
-    movlw   ENDPT_IN_ONLY        ; EP1 is gets output from host
+    movlw   ENDPT_IN_ONLY        ; EP2 sends the host data
     movwf   UEP2, ACCESS          ; 
     return
     

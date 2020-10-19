@@ -6,7 +6,6 @@
 using namespace std;
 
 void printdev(libusb_device *dev); //prototype of the function
-int interruptTransferOut(libusb_device_handle*, unsigned char *data);
 libusb_device_handle* claimInterface(libusb_device_handle *dev_handle);
 void resetDevice(libusb_device_handle* dev_handle);
 void printDetails(libusb_context *ctx);
@@ -231,13 +230,13 @@ void printdev(libusb_device *dev)
 
 void interruptInToComputerTransfer(libusb_device_handle* dev_handle) {
     unsigned char *data = new unsigned char[10];      //data to write
-    data[0]='m';
-    data[1]='a';
-    data[2]='r';
-    data[3]='t';
-    data[4]='s';
-    data[5]='\r';
-    data[6]='\n';
+    data[0]='\0';
+    data[1]='\0';
+    data[2]='\0';
+    data[3]='\0';
+    data[4]='\0';
+    data[5]='\0';
+    data[6]='\0';
     data[7]='\0'; 
     data[8]='\0'; 
     data[9]='\0'; 
@@ -288,63 +287,41 @@ int main()
     dev_handle = claimInterface(dev_handle);
 
     unsigned char *data = new unsigned char[10];      //data to write
-    data[0]='m';
+    data[0]='M';
     data[1]='a';
     data[2]='r';
     data[3]='t';
-    data[4]='s';
+    data[4]='y';
     data[5]='\r';
     data[6]='\n';
     data[7]='\0'; 
-    data[8]='\0'; 
-    data[9]='\0'; 
-
-    if (dev_handle) { 
+    
+    if (dev_handle) {
         int result = -1;
-        int tries = 5;
-        while (tries-- > 0) {
 
-            snprintf((char*)data, 8, "%d\r\n",tries);
-            result = interruptTransferOut(dev_handle,data);
-            usleep(3000);
-        }
+        snprintf((char*)data, 8, "M___%d\r\n",1);
+        result = interruptTransferOut(dev_handle,data);
+        snprintf((char*)data, 8, "M__%d\r\n",2);
+        result = interruptTransferOut(dev_handle,data);
+        snprintf((char*)data, 8, "M___%d\r\n",3);
+        result = interruptTransferOut(dev_handle,data);
+        snprintf((char*)data, 8, "M___%d\r\n",4);
+        result = interruptTransferOut(dev_handle,data);
+        snprintf((char*)data, 8, "M___%d\r\n",5);
+        result = interruptTransferOut(dev_handle,data);
+        snprintf((char*)data, 8, "M___%d\r\n",6);
+        result = interruptTransferOut(dev_handle,data);
+        snprintf((char*)data, 8, "M___%d\r\n",7);
+        result = interruptTransferOut(dev_handle,data);
+        snprintf((char*)data, 8, "M___%d\r\n",8);
+        result = interruptTransferOut(dev_handle,data);
 
-
-        unsigned int timeout = 500;
-
-        int transferred = 0;
-
-        data[0] = '\0';
-        data[1] = '\0';
-        data[2] = '\0';
-        data[3] = '\0';
-
-      //  usleep(3000);
-
-      //unsigned char endpointId = 2 |LIBUSB_ENDPOINT_IN;
-      //result = libusb_interrupt_transfer(dev_handle,
-      //                                   endpointId,
-      //                                   data,
-      //                                   8,
-      //                                   &transferred,
-      //                                   timeout);
-      //if (result == 0) {
-      //    cout << "Transferred bytes: "  << transferred << endl;
-      //    cout <<                 data[0] << endl;
-      //    cout <<                 data[1] << endl;
-      //    cout <<                 data[2] << endl;
-      //    cout <<                 data[3] << endl;
-      //    cout <<                 data[4] << endl;
-      //    cout <<                 data[5] << endl;
-      //    cout <<                 data[6] << endl;
-      //    cout <<                 data[7] << endl;
-      //}
-      //else {
-      //    showError(result);
-      //}
-    interruptInToComputerTransfer(dev_handle);
-    cout << " Try another read..." << endl;
-    interruptInToComputerTransfer(dev_handle);
+        cout << "Read one ..." << endl;
+        interruptInToComputerTransfer(dev_handle);
+        cout << "Read two ..." << endl;
+        interruptInToComputerTransfer(dev_handle);
+        cout << "Read three ..." << endl;
+        interruptInToComputerTransfer(dev_handle);
 
 
 

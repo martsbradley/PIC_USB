@@ -2,7 +2,7 @@
     #include util_macros.inc
     #include rs232.inc
    
-    global InitUsartComms, PrintStrFn
+    global InitUsartComms, PrintStrFn, PrintDataFn
     global RS232_ReadByteFromBuffer
     
     extern RS232_RINGBUFFER, RS232_RINGBUFFER_HEAD, RS232_RINGBUFFER_TAIL
@@ -250,6 +250,7 @@ RS232_AddByteToBuffer:
 ;===============================================================================
 
 PrintStrFn:
+    banksel RS232_Temp4
     ; If there space in the buffer to hold the string
     call StringLengthFN
     movwf RS232_Temp4, BANKED
@@ -271,7 +272,7 @@ RS232_AddNextByte:
     ; If zero was just added then 
     ; raise the interrupt enable and return.
 
-    addlw 0x00              ; Check for end of string \0 character
+;    addlw 0x00              ; Check for end of string \0 character
     btfss STATUS,Z, ACCESS  ; If zero bit is set stop adding bytes
     goto RS232_AddNextByte
 
@@ -282,5 +283,46 @@ PrintStrFnDone:
     return
     
     
+PrintDataFn:
+    banksel RS232_Temp4
+    movlw  0x08                ; Up to eight bytes want to print
+    movwf RS232_Temp4, BANKED
+
+    bcf PIE1, TXIE,  ACCESS   ; Disable interrupts as we want the ring buffer
+			      ; not to change while updating it.      
+			      
+    call RS232_RingBufferBytesFree_FN
+    ; Loosing one byte because using <, should be <=
+    cpfslt RS232_Temp4, BANKED; skip next when String length < Bytes Free
+    goto PrintDataFnDone       ; Don't print string.
+
+RS232DATA_AddNextByte:
+    movf POSTINC1, W, ACCESS  ; Read byte and increment pointer
+
+;    nop
+;    nop
+    
+    call RS232_AddByteToBuffer
+
+;    nop
+;    nop
+    
+    ; If zero was just added then 
+    ; raise the interrupt enable and return.
+
+;    addlw 0x00              ; Check for end of string \0 character
+;    nop
+;    nop
+;    nop
+;    nop
+    
+    btfss STATUS,Z, ACCESS  ; If zero bit is set stop adding bytes
+    goto RS232DATA_AddNextByte
+
+    ; Update the RS232 to send the details from the buffer.
+    
+PrintDataFnDone:   
+    bsf PIE1, TXIE,  ACCESS   ; Enable interrupts again
+    return    
     
     END                         ;Stop assembling here
