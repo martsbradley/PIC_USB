@@ -7,59 +7,42 @@ import org.usb4java.DeviceHandle;
 import org.usb4java.DeviceList;
 import org.usb4java.LibUsb;
 import org.usb4java.LibUsbException;
-import static java.lang.System.out;
+import org.usb4java.TransferCallback;
+ 
 
 import java.nio.ByteBuffer;
 import java.nio.IntBuffer;
+import java.util.function.Consumer;
+import static java.lang.System.out;
 
 public class App {
     static final int interfaceNumber = 0;
     static final short vendorId = 1240;
     static final short productId = 20;
-    static final long timeout = 1000;
 
-    private static void sendControlTransfer(DeviceHandle handle) {
-        ByteBuffer buffer = ByteBuffer.allocateDirect(8);
-
-        buffer.put(new byte[] { 'M', 'a', 'r', 't', 'y', '\r', '\n', '\0' });
-
-        int transfered = LibUsb.controlTransfer(handle, (byte) (LibUsb.REQUEST_TYPE_CLASS | LibUsb.RECIPIENT_INTERFACE),
-                (byte) 0x09, (short) 2, (short) 1, buffer, timeout);
-
-        if (transfered < 0) {
-            throw new LibUsbException("Control transfer failed", transfered);
-        }
-
-        System.out.println(transfered + " bytes sent");
-    }
-
-    private static void sendInterruptTransfer(DeviceHandle handle) {
-        out.println("Interrupt Transfer");
-        
-        ByteBuffer buffer = ByteBuffer.allocateDirect(8);
-        buffer.put(new byte[] { 'M', 'a', 'r', 't', 'y', '\r', '\n', '\0' });
-
-        byte endpoint = 1 | LibUsb.ENDPOINT_OUT;
-
-        IntBuffer transferred = IntBuffer.allocate(64);
-
-        LibUsb.interruptTransfer(handle, endpoint, buffer, transferred, timeout);
-    }
-
-    private static void claim(DeviceHandle handle) {
+    private static void claim(DeviceHandle handle, Consumer<DeviceHandle> program) throws InterruptedException {
         int result = LibUsb.claimInterface(handle, interfaceNumber);
 
         checkResult(result, "Unable to claim interface");
         out.println("Interface claimed");
         try {
-            sendInterruptTransfer(handle);
+
+            program.accept(handle);
+            out.println("accept completed");
+            
+            for (int times = 0; times < 4; times++) {
+               // out.println("main thread sleeping");
+                Thread.sleep(1000);
+                
+            }
         } finally {
             result = LibUsb.releaseInterface(handle, interfaceNumber);
+            out.println("Interface released");
             checkResult(result, "Unable to release interface");
         }
     }
 
-    private static void openDevice(Device device) {
+    private static void openDevice(Device device, Consumer<DeviceHandle> program) throws InterruptedException {
         int result = -1;
         DeviceHandle handle = new DeviceHandle();
         try {
@@ -69,7 +52,7 @@ public class App {
             
             out.println("Obtained handle");
             
-            claim(handle);
+            claim(handle, program);
         } finally {
             if (result == 0) {
                 LibUsb.close(handle);
@@ -90,10 +73,10 @@ public class App {
                 result = LibUsb.getDeviceDescriptor(device, descriptor);
 
                 checkResult(result, "Unable to read device descriptor");
-                out.printf("Vendor %d Product %d%n", descriptor.idVendor(), descriptor.idProduct());
-                out.println(descriptor);
-
-                out.println("\n\n");
+//                out.printf("Vendor %d Product %d%n", descriptor.idVendor(), descriptor.idProduct());
+//                out.println(descriptor);
+//
+//                out.println("\n\n");
                 if (descriptor.idVendor() == vendorId && descriptor.idProduct() == productId) {
                     return device;
                 }
@@ -110,7 +93,7 @@ public class App {
         }
     }
     
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
         System.out.println("Hello World!");
 
         Context context = new Context();
@@ -123,7 +106,15 @@ public class App {
             Device dev = findDevice(context);
             if (dev != null) {
                 out.println("Device found :-)");
-                openDevice(dev);
+                
+                EventHandlingThread thread = new EventHandlingThread(context);
+                thread.start();
+                
+                openDevice(dev, new InterruptHandler());
+                
+                
+
+                thread.join();
             }
             else {
                 out.println("Device not found.");
