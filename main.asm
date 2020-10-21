@@ -65,6 +65,19 @@
 #define SIE_STALL      0x84   ;1000 0100
 #define CPU_DTSEN      0x08   ;0000 1000
 
+    
+;   Bits of the PORT B as are as follows
+;   7 EP2
+;   6 EP1
+;   5 EP0
+;   4 Idle
+
+;   3 Config
+;   2 Addresso
+;   1 Default
+;   0 Power
+
+    
 
     extern PrintStrFn, PrintDataFn
     extern InitUsartComms, Delay
@@ -91,7 +104,7 @@ RS232_Temp8           res 1
 USB_BufferDescriptor  res 4
 USB_BufferData        res 8
 USB_error_flags       res 1  ; Was there an error.
-USB_curr_config       res 1  ; Holds the value of the current configuration.
+USB_curr_config       res 1  ; Selected USB configuration, 0 until 1 when setup.
 USB_device_status     res 1  ; Byte, sent to host request status
 USB_dev_req           res 1
 USB_address_pending   res 1  ; hold address until it is confirmed.
@@ -1344,16 +1357,16 @@ Main
     clrf        COUNTER_H, BANKED
 
     repeat
-        banksel COUNTER_L
-        incf    COUNTER_L, F, BANKED
-        ifset STATUS, Z, ACCESS
-            incf COUNTER_H, F, BANKED
-        endi
-        ifset  COUNTER_H, 7, BANKED
-            bcf PORTA, 1, ACCESS
-        otherwise
-            bsf PORTA, 1, ACCESS
-        endi
+;        banksel COUNTER_L
+;        incf    COUNTER_L, F, BANKED
+;        ifset STATUS, Z, ACCESS
+;            incf COUNTER_H, F, BANKED
+;        endi
+;        ifset  COUNTER_H, 7, BANKED
+;            bcf PORTA, 1, ACCESS
+;        otherwise
+;            bsf PORTA, 1, ACCESS
+;        endi
         call   ServiceUSB
 
     forever
