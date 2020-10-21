@@ -19,11 +19,15 @@ public class InterruptHandler implements Consumer<DeviceHandle> {
 
     static final long timeout = 1000;
 
+    DeviceHandle handle ;;;// this ain't great.
     
     @Override
     public void accept(DeviceHandle handle) {
+        this.handle = handle;
         write(handle, 8, martyWritten);
-        read(handle, 8, readABC);
+        write(handle, 8, martyWritten);
+        write(handle, 8, martyWritten);
+        write(handle, 8, martyWritten);
         
         System.out.printf("%s is the main thread%n", 
                            Thread.currentThread().getName()); 
@@ -60,8 +64,12 @@ public class InterruptHandler implements Consumer<DeviceHandle> {
      *            The callback to execute when data has been received.
      */
     public void write(DeviceHandle handle, int size, TransferCallback callback)
-    {                    //1234567
-        String myString = "the lazy dog jumped over the brown fox.\r\n";
+    {                    
+         
+                          //1       2       3       4       5       6      7        
+                          //12345678123456781234567812345678123456781234567812345678
+        String myString = "the lazy dog jumped over the brown foX|\r\n";
+
         size= myString.length();
         
         ByteBuffer buffer = ByteBuffer.allocateDirect(size);
@@ -94,6 +102,9 @@ public class InterruptHandler implements Consumer<DeviceHandle> {
                                     ++callBackTimes, 
                                     transfer.actualLength());
             LibUsb.freeTransfer(transfer);            
+
+            //  When the writing is done do some reading.
+            read(handle, 8, readABC);
         }
     };
     

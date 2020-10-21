@@ -121,7 +121,7 @@ void resetDevice(libusb_device_handle* dev_handle) {
 
 
 
-int interruptTransferOut(libusb_device_handle* dev_handle, unsigned char *data) {
+int interruptTransferOut(libusb_device_handle* dev_handle, unsigned char *data, int size) {
 
     unsigned int timeout = 1000;
 
@@ -130,7 +130,7 @@ int interruptTransferOut(libusb_device_handle* dev_handle, unsigned char *data) 
     int result = libusb_interrupt_transfer(dev_handle,
                                            endpointId,
                                            data,
-                                           8,
+                                           size,
                                            &transferred,
                                            timeout);
     if (result == 0) {
@@ -311,30 +311,30 @@ int main()
     if (dev_handle) {
         int result = -1;
 
-        snprintf((char*)data, 8, "M___%d\r\n",1);
-        result = interruptTransferOut(dev_handle,data);
-        snprintf((char*)data, 8, "M___%d\r\n",2);
-        result = interruptTransferOut(dev_handle,data);
-        snprintf((char*)data, 8, "M___%d\r\n",3);
-        result = interruptTransferOut(dev_handle,data);
-        snprintf((char*)data, 8, "M___%d\r\n",4);
-        result = interruptTransferOut(dev_handle,data);
-        snprintf((char*)data, 8, "M___%d\r\n",5);
-        result = interruptTransferOut(dev_handle,data);
-        snprintf((char*)data, 8, "M___%d\r\n",6);
-        result = interruptTransferOut(dev_handle,data);
-        snprintf((char*)data, 8, "M___%d\r\n",7);
-        result = interruptTransferOut(dev_handle,data);
-        snprintf((char*)data, 8, "M___%d\r\n",8);
-        result = interruptTransferOut(dev_handle,data);
-        snprintf((char*)data, 8, "M___%d\r\n",9);
-        result = interruptTransferOut(dev_handle,data);
-        snprintf((char*)data, 8, "M___%c\r\n",'x');
-        result = interruptTransferOut(dev_handle,data);
-        snprintf((char*)data, 8, "M___%c\r\n",'y');
-        result = interruptTransferOut(dev_handle,data);
-        snprintf((char*)data, 8, "M___%c\r\n",'z');
-        result = interruptTransferOut(dev_handle,data);
+      //snprintf((char*)data, 8, "M___%d\r\n",1);
+      //result = interruptTransferOut(dev_handle,data);
+      //snprintf((char*)data, 8, "M___%d\r\n",2);
+      //result = interruptTransferOut(dev_handle,data);
+      //snprintf((char*)data, 8, "M___%d\r\n",3);
+      //result = interruptTransferOut(dev_handle,data);
+      //snprintf((char*)data, 8, "M___%d\r\n",4);
+      //result = interruptTransferOut(dev_handle,data);
+      //snprintf((char*)data, 8, "M___%d\r\n",5);
+      //result = interruptTransferOut(dev_handle,data);
+      //snprintf((char*)data, 8, "M___%d\r\n",6);
+      //result = interruptTransferOut(dev_handle,data);
+      //snprintf((char*)data, 8, "M___%d\r\n",7);
+      //result = interruptTransferOut(dev_handle,data);
+      //snprintf((char*)data, 8, "M___%d\r\n",8);
+      //result = interruptTransferOut(dev_handle,data);
+      //snprintf((char*)data, 8, "M___%d\r\n",9);
+      //result = interruptTransferOut(dev_handle,data);
+      //snprintf((char*)data, 8, "M___%c\r\n",'x');
+      //result = interruptTransferOut(dev_handle,data);
+      //snprintf((char*)data, 8, "M___%c\r\n",'y');
+      //result = interruptTransferOut(dev_handle,data);
+      //snprintf((char*)data, 8, "M___%c\r\n",'z');
+      //result = interruptTransferOut(dev_handle,data);
 
 
 
@@ -347,7 +347,7 @@ int main()
         const char *newLine = "\r\n";
         cout << "Send some data, ctrl-c to finish:" << endl;
         while (getline (cin, mystr) ) {
-            cout << mystr << endl;
+            cout << "1234567812345678123456781234567812345678123456781234567812345678" <<  endl;
 
             while (mystr.length() > 0) {
 
@@ -356,16 +356,19 @@ int main()
                 memcpy(&data[0],mystr.c_str(), 8);
 
                 int length = mystr.length();
-                mystr.erase(0, min(8, length));
+                int dataLen = min(8, length);
+                cout << "dataLen " << dataLen<< endl;
+                mystr.erase(0, dataLen);
 
-                result = interruptTransferOut(dev_handle,data);
+                cout << "Remaining '" << mystr << "'" << endl;
+                result = interruptTransferOut(dev_handle,data, dataLen);
             }
 
 
             memset(&data[0],0,8);
             strncpy((char*)&data[0], newLine, 2);
             
-            result = interruptTransferOut(dev_handle,data);
+            result = interruptTransferOut(dev_handle,data, 2);
 
         }
 

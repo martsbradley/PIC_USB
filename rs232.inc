@@ -15,11 +15,14 @@ PrintStr macro string
 
 ; Print a string from GFR General File Registors 
 ; Using FSR1 because the add to buffer uses FSR2
+; W should already have the number of bytes that need printed.
 PrintData macro string
-    movlw   high string
+    banksel RS232_Temp4
+    movwf RS232_Temp4, BANKED
+    
+    movlw high string
     movwf FSR1H, ACCESS
-
-    movlw   low string
+    movlw low string
     movwf FSR1L, ACCESS
 
     call PrintDataFn

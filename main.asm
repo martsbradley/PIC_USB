@@ -378,28 +378,12 @@ ServiceUSB
         bcf     UIR, TRNIF, ACCESS
 
         clrf    UEP0, ACCESS          ; clear all EP control registers
-        call clearNonControlEndPoints
 
-        banksel BD0OBC
-        movlw   MAX_PACKET_SIZE       ; 8 bytes lowest packet size for low and high speed.
-        movwf   BD0OBC, BANKED
-        movlw   low USB_Buffer        ; Get low bits from for the USB_Buffer
-        movwf   BD0OAL, BANKED        ; EP0 OUT gets a buffer...
-        movlw   high USB_Buffer       ; Get high bits from for the USB_Buffer
-        movwf   BD0OAH, BANKED        ; ...set up its address
-        movlw   SIE_DTSEN             ; set UOWN bit (USB can write)
-        movwf   BD0OST, BANKED        ; Controller hands over the buffer to the SIE.
-        movlw   low (USB_Buffer+MAX_PACKET_SIZE)    ; EP0 IN gets a buffer...
-        movwf   BD0IAL, BANKED
-        movlw   high (USB_Buffer+MAX_PACKET_SIZE)
-        movwf   BD0IAH, BANKED        ; ...set up its address
-        movlw   CPU_DTSEN
-        movwf   BD0IST, BANKED        ; Microcontroller owns EP0 I
+        call clearNonControlEndPoints
+        call setupEndpoint0
 
         clrf    UADDR, ACCESS         ; set USB Address to 0
         clrf    UIR, ACCESS           ; clear all the USB interrupt flags
-        movlw   ENDPT_CONTROL         ; Setup UEP0 by setting EPHSHK, EPOUTEN & EPINEN
-        movwf   UEP0, ACCESS          ; EP0 is a control pipe and requires an ACK
 
 
         movlw   0xFF
@@ -422,15 +406,15 @@ ServiceUSB
         andlw    0x7C              ; Mask out bits other than Endpoint and Direction
         movwf    FSR0L, ACCESS     ;    0000100 0EEEED00 (FSR0H-FSR0L)
         banksel  USB_BufferDescriptor   ; eg 0000100 00000000 EP0 Out -> 0x400  // are in and out in the correct order
-        movf     POSTINC0, W            ;    0000100 00000100 EP0 IN  -> 0x404
+        movf     POSTINC0, W, ACCESS    ;    0000100 00000100 EP0 IN  -> 0x404
                                         ;    0000100 00001000 EP1 Out -> 0x408
                                         ;    0000100 00001100 EP1 In  -> 0x40C
         movwf    USB_BufferDescriptor, BANKED  ; Copy received data to USB_BufferDescriptor
-        movf     POSTINC0, W
+        movf     POSTINC0, W, ACCESS
         movwf    USB_BufferDescriptor+1, BANKED
-        movf     POSTINC0, W
+        movf     POSTINC0, W, ACCESS
         movwf    USB_BufferDescriptor+2, BANKED
-        movf     POSTINC0, W
+        movf     POSTINC0, W, ACCESS
         movwf    USB_BufferDescriptor+3, BANKED ; USB_BufferDescriptor now populated.
         movf     USTAT, W, ACCESS
         movwf    USB_USTAT, BANKED  ; Save the USB status register
@@ -906,13 +890,13 @@ StandardRequests
                 movwf  USB_USWSTAT, BANKED
 		call setupEndpoint1
 		call setupEndpoint2
-		
+
 #ifdef SHOW_ENUM_STATUS
                 movlw  0xE0
                 andwf  PORTB, F, ACCESS
-                bsf    PORTB, 3, ACCESS                
+                bsf    PORTB, 3, ACCESS
 #endif
-		
+
             ends
 
             call updateControlTxZeroBytes
@@ -1065,7 +1049,7 @@ ProcessInToken
         movwf   POSTINC0
 	movlw   0x00  ; Char '\0'
         movwf   POSTINC0
-	
+
 	banksel BD2IBC
 	movlw   8
 	movwf   BD2IBC, BANKED
@@ -1102,8 +1086,8 @@ ProcessOutToken
 	break
     case EP1
         ; Receive data from the host and send it out on RS232.
+
 	call copyPayloadToBufferData
-	banksel USB_BufferData
         PrintData USB_BufferData
 
 	banksel BD1OBC
@@ -1188,24 +1172,67 @@ copyPayloadToBufferData:
     movwf    FSR0H, ACCESS
     movf     USB_BufferDescriptor+ADDRESSL, W, BANKED
     movwf    FSR0L, ACCESS
-    movf     POSTINC0, W
+    movf     POSTINC0, W, ACCESS
     movwf    USB_BufferData, BANKED
-    movf     POSTINC0, W
+    movf     POSTINC0, W, ACCESS
     movwf    USB_BufferData+1, BANKED  ; Move received bytes to USB_BufferData
-    movf     POSTINC0, W
+    movf     POSTINC0, W, ACCESS
     movwf    USB_BufferData+2, BANKED  ; Move received bytes to USB_BufferData
-    movf     POSTINC0, W
+    movf     POSTINC0, W, ACCESS
     movwf    USB_BufferData+3, BANKED  ; Move received bytes to USB_BufferData
-    movf     POSTINC0, W
+    movf     POSTINC0, W, ACCESS
     movwf    USB_BufferData+4, BANKED  ; Move received bytes to USB_BufferData
-    movf     POSTINC0, W
+    movf     POSTINC0, W, ACCESS
     movwf    USB_BufferData+5, BANKED  ; Move received bytes to USB_BufferData
-    movf     POSTINC0, W
+    movf     POSTINC0, W, ACCESS
     movwf    USB_BufferData+6, BANKED  ; Move received bytes to USB_BufferData
-    movf     POSTINC0, W
+    movf     POSTINC0, W, ACCESS
     movwf    USB_BufferData+7, BANKED  ; Move received bytes to USB_BufferData
+    
+    movf     USB_BufferDescriptor+ADDRESSH, W, BANKED
+    movwf    FSR0H, ACCESS
+    movf     USB_BufferDescriptor+ADDRESSL, W, BANKED
+    movwf    FSR0L, ACCESS
+    
+    clrf    POSTINC0, ACCESS
+    clrf    POSTINC0, ACCESS
+    clrf    POSTINC0, ACCESS
+    clrf    POSTINC0, ACCESS
+    
+    clrf    POSTINC0, ACCESS
+    clrf    POSTINC0, ACCESS
+    clrf    POSTINC0, ACCESS
+    clrf    POSTINC0, ACCESS
+    
+    
+    ;Leave the count of bytes in the W register.
+    movf     USB_BufferDescriptor+BYTECOUNT, W, BANKED
+    
     return
 
+
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+setupEndpoint0:
+    banksel BD0OBC
+    movlw   MAX_PACKET_SIZE       ; 8 bytes lowest packet size for low and high speed.
+    movwf   BD0OBC, BANKED
+    movlw   low (USB_Buffer+  0*MAX_PACKET_SIZE); Get low bits from for the USB_Buffer
+    movwf   BD0OAL, BANKED        ; EP0 OUT gets a buffer...
+    movlw   high (USB_Buffer+ 0*MAX_PACKET_SIZE); Get high bits from for the USB_Buffer
+    movwf   BD0OAH, BANKED        ; ...set up its address
+    movlw   SIE_DTSEN             ; set UOWN bit (USB can write)
+    movwf   BD0OST, BANKED        ; Controller hands over the buffer to the SIE.
+
+    movlw   low (USB_Buffer + 1*MAX_PACKET_SIZE)    ; EP0 IN gets a buffer...
+    movwf   BD0IAL, BANKED
+    movlw   high (USB_Buffer+ 1*MAX_PACKET_SIZE)
+    movwf   BD0IAH, BANKED        ; ...set up its address
+    movlw   CPU_DTSEN
+    movwf   BD0IST, BANKED        ; Microcontroller owns EP0 I
+
+    movlw   ENDPT_CONTROL         ; Setup UEP0 by setting EPHSHK, EPOUTEN & EPINEN
+    movwf   UEP0, ACCESS          ; EP0 is a control pipe and requires an ACK
+    return
 
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 setupEndpoint1:
@@ -1225,8 +1252,6 @@ setupEndpoint1:
     movwf   UEP1, ACCESS          ;
 
     return
-
-
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 setupEndpoint2:
     banksel BD2IBC
@@ -1242,7 +1267,6 @@ setupEndpoint2:
     movlw   ENDPT_IN_ONLY        ; EP2 sends the host data
     movwf   UEP2, ACCESS          ;
     return
-
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 clearNonControlEndPoints:
     clrf    UEP1, ACCESS          ; to disable all endpoints.
