@@ -24,3 +24,39 @@ input and output.
 
 
 https://www.beyondlogic.org/usbnutshell/usb4.shtml
+
+
+======================================================================
+
+PID Type
+
+Token        (Only the host can issue token packets.)
+	SETUP
+	OUT
+	IN   
+
+
+
+Data
+	Data0
+	Data1
+
+Handshake
+	ACK
+	NAK
+	STALL		Only sent by the function, to indicate that it
+			cannot send or receive data
+
+IN Tokens, cause data transactions from the host to a function.
+Out and Setup Tokens cause a Data transaction from a function to the host)
+SETUP transactions are similar in format to an OUT, but use a SETUP rather than
+an OUT PID	
+
+DATA0 when the endpoint experiences any configuration event
+
+
+Control transfers minimally have two transaction stages: Setup and Status
+
+
+A control transfer may optionally contain a Data stage between the Setup and
+Status stages.  Status reporting is always in the function-to-host direction.

@@ -1,7 +1,7 @@
-; 
+;
 ; Author: Bradley A. Minch
 ; Organization: Franklin W. Olin College of Engineering
-; Revision History: 
+; Revision History:
 ;     01/19/2006 - Added wait for initial SE0 condition to clear at the end
 ;                  of InitUSB.
 ;     01/13/2006 - Fixed problem with DATA OUT transfers (only worked properly
@@ -10,7 +10,7 @@
 ;                  request.  Changed code to use BSTALL instead of EPSTALL for
 ;                  Request Error on EP0.  Changed CLEAR_FEATURE, SET_FEATURE
 ;                  and GET_STATUS requests to use BSTALL instead of EPSTALL.
-;                  Changed over from the deprecated __CONFIG assembler directive 
+;                  Changed over from the deprecated __CONFIG assembler directive
 ;                  to config for setting the configuration bits.  Eliminated the
 ;                  initial for loop from the start of the main section.
 ;     06/22/2005 - Added code to disable all endpoints on URSTIF and to mask
@@ -18,35 +18,35 @@
 ;     04/21/2005 - Initial public release.
 ;
 ; ============================================================================
-; 
+;
 ; Peripheral Description:
-; 
-; This peripheral enumerates as a vendor-specific device. The main event loop 
-; blinks an LED connected to RA1 on and off at about 2 Hz and the peripheral 
+;
+; This peripheral enumerates as a vendor-specific device. The main event loop
+; blinks an LED connected to RA1 on and off at about 2 Hz and the peripheral
 ; responds to a pair of vendor-specific requests that turn on or off an LED ;
-; connected to RA0.  The firmware is configured to use an external 4-MHz 
-; crystal, to operate as a low-speed USB device, and to use the internal 
+; connected to RA0.  The firmware is configured to use an external 4-MHz
+; crystal, to operate as a low-speed USB device, and to use the internal
 ; pull-up resistor.
-; 
+;
 ; ============================================================================
 ;
 ; Software Licence Agreement:
-; 
-; THIS SOFTWARE IS PROVIDED IN AN "AS IS" CONDITION.  NO WARRANTIES, WHETHER 
-; EXPRESS, IMPLIED OR STATUTORY, INCLUDING, BUT NOT LIMITED TO, IMPLIED 
-; WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE APPLY 
-; TO THIS SOFTWARE. THE AUTHOR SHALL NOT, UNDER ANY CIRCUMSTANCES, BE LIABLE 
+;
+; THIS SOFTWARE IS PROVIDED IN AN "AS IS" CONDITION.  NO WARRANTIES, WHETHER
+; EXPRESS, IMPLIED OR STATUTORY, INCLUDING, BUT NOT LIMITED TO, IMPLIED
+; WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE APPLY
+; TO THIS SOFTWARE. THE AUTHOR SHALL NOT, UNDER ANY CIRCUMSTANCES, BE LIABLE
 ; FOR SPECIAL, INCIDENTAL OR CONSEQUENTIAL DAMAGES, FOR ANY REASON WHATSOEVER.
-; 
+;
 #include <p18f2550.inc>
 #include "usb_defs.inc"
-#include "engr2210.inc" 
+#include "engr2210.inc"
 #include "rs232.inc"
-    config PLLDIV = 1, CPUDIV = OSC1_PLL2 , USBDIV = 2,FOSC = XT_XT 
+    config PLLDIV = 1, CPUDIV = OSC1_PLL2 , USBDIV = 2,FOSC = XT_XT
     config IESO = OFF,PWRT = OFF,BOR = OFF, VREGEN = OFF,WDT = OFF,WDTPS = 32768   ;  I turned this off!!!
     config MCLRE = ON,LPT1OSC = OFF, PBADEN = OFF, CCP2MX = ON
     config STVREN = ON
-    config LVP = OFF 
+    config LVP = OFF
     config XINST = OFF
     config DEBUG = ON
     config CP0 = OFF, CP1 = OFF, CP2 = OFF, CP3 = OFF
@@ -59,8 +59,24 @@
 #define    SET_RA0            0x01        ; vendor-specific request to set RA0 to high
 #define    CLR_RA0            0x02        ; vendor-specific request to set RA0 to low
 
-    
-    
+;  uown|dts|ken|incdis|dtsen|bstall|bc9|bc8
+
+;  DTS: Data Toggle Synchronization bit (2)
+;  1 = Data 1 packet
+;  0 = Data 0 packet
+
+;  DTSEN: Data Toggle Synchronization Enable bit
+;  1 = Data toggle synchronization is enabled; data packets with incorrect Sync value will be ignored
+;  except for a SETUP transaction, which is accepted even if the data toggle bits do not match
+;  0 = No data toggle synchronization is performed
+
+; BUFFER STATUS Register
+#define SIE_DTS_DTSEN  0xC8   ;1100 1000
+#define SIE_DTSEN      0x88   ;1000 1000
+#define SIE_STALL      0x84   ;1000 0100
+#define CPU_DTSEN      0x08   ;0000 1000
+
+
     extern PrintStrFn, PrintDataFn
     extern InitUsartComms, Delay
     extern InterruptServiceRoutine
@@ -70,7 +86,7 @@
     global RS232_Temp4, RS232_Temp5, RS232_Temp6, RS232_Temp7,RS232_Temp8
 
 
-    
+
 ;bank0        udata
 mybank1 udata   0x300
 RS232_RINGBUFFER      res SIZE         ;  this should be aligned on a byte.
@@ -98,11 +114,11 @@ USB_bytes_left        res 1
 USB_loop_index        res 1
 USB_packet_length     res 1
 USB_USTAT             res 1 ; Saved copy of USTAT special function register in memory.
-USB_USWSTAT           res 1 ; Current state POWERED_STATE|DEFAULT_STATE|ADDRESS_STATE|CONFIG_STATE 
+USB_USWSTAT           res 1 ; Current state POWERED_STATE|DEFAULT_STATE|ADDRESS_STATE|CONFIG_STATE
 COUNTER_L             res 1
 COUNTER_H             res 1
 
-LAUNCH_PROGRAM code     0x00  
+LAUNCH_PROGRAM code     0x00
     goto        Main                    ; Reset vector
     nop
     nop
@@ -167,7 +183,7 @@ getDescriptorByte
     movlw   upper Descriptor_begin
     movwf   TBLPTRU, ACCESS
     movlw   high Descriptor_begin
-    movwf   TBLPTRH, ACCESS                  ; Now TBLPTR pointing towards descriptor. 
+    movwf   TBLPTRH, ACCESS                  ; Now TBLPTR pointing towards descriptor.
     movlw   low Descriptor_begin             ;
     banksel USB_desc_ptr                     ; ptr could be renamed idx.
     addwf   USB_desc_ptr, W, BANKED
@@ -215,14 +231,14 @@ EndPoint1
 
 EndPoint2
     db            ENDPOINT, 0x82        ; bDescriptorType, bEndpointAddr & Direction IN
-    db            0x03, 0x08            ; No Synch Interrupt  
+    db            0x03, 0x08            ; No Synch Interrupt
     db            0x00, 0x04            ; one byte
-    
+
 ;EndPoint2
 ;    db            0x07, ENDPOINT        ; bLength, bDescriptorType
-;    db            0x82, 0x03            ; bEndpointAddr & Direction IN, No Synch Interrupt  
+;    db            0x82, 0x03            ; bEndpointAddr & Direction IN, No Synch Interrupt
 ;    db            0x01, 0x00            ; one byte
-;    db            0x04                  ; Interval...?    
+;    db            0x04                  ; Interval...?
 
 String0
     db            String1-String0, STRING    ; bLength, bDescriptorType
@@ -322,7 +338,7 @@ ServiceUSB
         clrf   UEIR, ACCESS           ;  Clear the error in software.
         break
     caseset    UIR, SOFIF, ACCESS     ;  Start of Frame token received by SIE
-        bcf    UIR, SOFIF, ACCESS     ;  Clear this flag 
+        bcf    UIR, SOFIF, ACCESS     ;  Clear this flag
         break
     caseset    UIR,  IDLEIF, ACCESS   ;  Idle condition detected (been idle for 3ms or more)
         bcf    UIR,  IDLEIF, ACCESS   ;  Clear that idle condition.
@@ -367,7 +383,7 @@ ServiceUSB
         break
     caseset UIR, URSTIF, ACCESS    ; USB Reset occurred.
 	PrintStr USB_RESET_STR
-	
+
         banksel USB_curr_config
         clrf    USB_curr_config, BANKED
         bcf     UIR, TRNIF, ACCESS    ; clear TRNIF four times to clear out the USTAT FIFO
@@ -375,7 +391,7 @@ ServiceUSB
         bcf     UIR, TRNIF, ACCESS
         bcf     UIR, TRNIF, ACCESS
 
-        clrf    UEP0, ACCESS          ; clear all EP control registers 
+        clrf    UEP0, ACCESS          ; clear all EP control registers
         call clearNonControlEndPoints
 
         banksel BD0OBC
@@ -385,14 +401,14 @@ ServiceUSB
         movwf   BD0OAL, BANKED        ; EP0 OUT gets a buffer...
         movlw   high USB_Buffer       ; Get high bits from for the USB_Buffer
         movwf   BD0OAH, BANKED        ; ...set up its address
-        movlw   0x88                  ; set UOWN bit (USB can write)
+        movlw   SIE_DTSEN             ; set UOWN bit (USB can write)
         movwf   BD0OST, BANKED        ; Controller hands over the buffer to the SIE.
         movlw   low (USB_Buffer+MAX_PACKET_SIZE)    ; EP0 IN gets a buffer...
         movwf   BD0IAL, BANKED
         movlw   high (USB_Buffer+MAX_PACKET_SIZE)
         movwf   BD0IAH, BANKED        ; ...set up its address
-        movlw   0x08                  ; clear UOWN bit (MCU can write)
-        movwf   BD0IST, BANKED
+        movlw   CPU_DTSEN
+        movwf   BD0IST, BANKED        ; Microcontroller owns BD0I
 
         clrf    UADDR, ACCESS         ; set USB Address to 0
         clrf    UIR, ACCESS           ; clear all the USB interrupt flags
@@ -400,29 +416,29 @@ ServiceUSB
         movwf   UEP0, ACCESS          ; EP0 is a control pipe and requires an ACK
 
 
-        movlw   0xFF               
+        movlw   0xFF
         movwf   UEIE, ACCESS          ; Enable all usb error interrupts
         banksel USB_USWSTAT
         movlw   DEFAULT_STATE         ; Enter default state since this is a reset.
         movwf   USB_USWSTAT, BANKED
         movlw   0x01                  ; Self powered, remote wakeup disabled
-        movwf   USB_device_status, BANKED   
+        movwf   USB_device_status, BANKED
     #ifdef SHOW_ENUM_STATUS
         movlw   0xE0
         andwf   PORTB, F, ACCESS
         bsf     PORTB, 1, ACCESS      ; set bit 1 of PORTB to indicate Powered state
     #endif
         break
-    caseset  UIR, TRNIF, ACCESS    ; Processing of pending transaction is complete; 
-        movlw    0x04              ; Buffer Descriptor table starts at Address 0x04
+    caseset  UIR, TRNIF, ACCESS    ; Processing of pending transaction is complete;
+        movlw    0x04              ; Buffer Descriptor table starts at Address 0x0400
         movwf    FSR0H, ACCESS     ; Indirect addressing, copy in high byte.
         movf     USTAT, W, ACCESS  ; Read USTAT register for endpoint information
         andlw    0x7C              ; Mask out bits other than Endpoint and Direction
         movwf    FSR0L, ACCESS     ;    0000100 0EEEED00 (FSR0H-FSR0L)
-        banksel  USB_BufferDescriptor   ; eg 0000100 00000000 EP0 Out -> 400h  // are in and out in the correct order
-        movf     POSTINC0, W            ;    0000100 00000100 EP0 IN  -> 404h
-                                        ;    0000100 00001000 EP1 Out -> 408h
-                                        ;    0000100 00001100 EP1 In  -> 40ch
+        banksel  USB_BufferDescriptor   ; eg 0000100 00000000 EP0 Out -> 0x400  // are in and out in the correct order
+        movf     POSTINC0, W            ;    0000100 00000100 EP0 IN  -> 0x404
+                                        ;    0000100 00001000 EP1 Out -> 0x408
+                                        ;    0000100 00001100 EP1 In  -> 0x40C
         movwf    USB_BufferDescriptor, BANKED  ; Copy received data to USB_BufferDescriptor
         movf     POSTINC0, W
         movwf    USB_BufferDescriptor+1, BANKED
@@ -439,11 +455,11 @@ ServiceUSB
         select                      ; Which endpoint was handled.
             case EP0
                 movlw  0x20       ;0010 0000 pin 5, my red led.. for control End point.
-                break                    
-            case EP1                     
+                break
+            case EP1
                 movlw  0x40       ;0100 0000 pin 6
-                break                    
-            case EP2                     
+                break
+            case EP2
                 movlw  0x80       ;1000 000  pin 7
                 break
         ends
@@ -473,9 +489,9 @@ ServiceUSB
             banksel BD0OBC
             movlw   MAX_PACKET_SIZE
             movwf   BD0OBC                ; ...get ready to receive the next Setup token...
-            movlw   0x84
+            movlw   SIE_STALL             ; Stall the endpoint
             movwf   BD0IST
-            movwf   BD0OST                ; ...and issue a protocol stall on EP0
+            movwf   BD0OST                ; Protocol stall on EP0 I & O
         endi
         break
     ends
@@ -492,22 +508,23 @@ ProcessSetupToken
     banksel  USB_BufferData+bmRequestType
 
 
+
     ;  Really don't understand this if statement!!!!!
     ifclr USB_BufferData+bmRequestType, 7, BANKED  ; Host to Device.
-        ifl  USB_BufferData+wLength,     NE, 0  ; 
-        orif USB_BufferData+wLengthHigh, NE, 0  ; 
-            movlw  0xC8     ; UOWN + DTS + INCDIS + DTSEN set
+        ifl  USB_BufferData+wLength,     NE, 0  ;
+        orif USB_BufferData+wLengthHigh, NE, 0  ;
+            movlw  SIE_DTS_DTSEN
         otherwise
-            movlw  0x88     ; UOWN + DTSEN set
+            movlw  SIE_DTSEN ; SIE owns the buffer
         endi
-    otherwise               ; Device to Host.
-        movlw      0x88     ; UOWN + DTSEN set
+    otherwise
+        movlw      SIE_DTSEN ; SIE owns the buffer
     endi
 
     banksel BD0OST
-    movwf   BD0OST, BANKED        ; set EP0 OUT UOWN back to USB and 
+    movwf   BD0OST, BANKED        ; set EP0 OUT UOWN back to USB and
                                   ; DATA0/DATA1 packet according to request type
-    bcf     UCON, PKTDIS, ACCESS  ; Assuming there is nothing to dequeue, 
+    bcf     UCON, PKTDIS, ACCESS  ; Assuming there is nothing to dequeue,
                                   ; token and packet processing enabled.
     banksel USB_dev_req
     movlw   NO_REQUEST
@@ -538,7 +555,7 @@ StandardRequests
     select
 
     ; >>>>  STANDARD REQUESTS  <<<< ;
-    case GET_STATUS   
+    case GET_STATUS
         ;  The host can ask for the status of the device, an interface or an
         ;  end point.
         movf  USB_BufferData+bmRequestType, W, BANKED
@@ -546,15 +563,15 @@ StandardRequests
         select
         case RECIPIENT_DEVICE
             call pointToCtrlEPInputBuffer
-            banksel USB_device_status               
-            movf    USB_device_status, W, BANKED 
+            banksel USB_device_status
+            movf    USB_device_status, W, BANKED
             movwf   POSTINC0                   ; copy device status byte to EP0 buffer
             clrf    INDF0
             banksel BD0IBC
             call updateControlTxTwoBytes
             break
 
-        case RECIPIENT_INTERFACE 
+        case RECIPIENT_INTERFACE
             movf USB_USWSTAT, W, BANKED
             select
             case ADDRESS_STATE
@@ -562,12 +579,12 @@ StandardRequests
                 bsf USB_error_flags, 0, BANKED
                 break
             case CONFIG_STATE
-                ; Used to return the status of the interface. Such a request to the 
+                ; Used to return the status of the interface. Such a request to the
                 ; interface should return two bytes of value 0x00.
 
                 ifl USB_BufferData+wIndex, LT, NUM_INTERFACES
                     call pointToCtrlEPInputBuffer
-                    clrf POSTINC0         ;  It is only clearing the two bytes of data. 
+                    clrf POSTINC0         ;  It is only clearing the two bytes of data.
                     clrf INDF0            ;  See comment 9 lines above.
                     call updateControlTxTwoBytes
                 otherwise
@@ -577,19 +594,19 @@ StandardRequests
                 break
             ends
             break
-        case RECIPIENT_ENDPOINT 
+        case RECIPIENT_ENDPOINT
             movf USB_USWSTAT, W, BANKED
             select
-            case ADDRESS_STATE  
+            case ADDRESS_STATE
                 ;  Returns two bytes indicating the status (Halted/Stalled) of a endpoint
                 movf USB_BufferData+wIndex, W, BANKED ; Get EP
                 andlw 0x0F                             ; Strip off direction bit
                 ifset STATUS, Z, ACCESS                ; see if it is EP0
                     call pointToCtrlEPInputBuffer
                     banksel USB_BufferData+wIndex
-                                                       
+
                     ifset USB_BufferData+wIndex, 7, BANKED ; If the specified direction is IN
-                        banksel  BD0IST                  
+                        banksel  BD0IST
                         movf     BD0IST, W, BANKED
                     otherwise
                         banksel  BD0OST
@@ -616,57 +633,57 @@ StandardRequests
                 movlw   high BD0OST                 ; put BDndST address...
                 movwf   FSR2H, ACCESS
 
-                ; Now ... 
+                ; Now ...
                 ; FSR0 contains address of BD0 IN BUFFER data
-                ; FSR1 contains address of UEP0 
+                ; FSR1 contains address of UEP0
                 ; FSR2 high byte contains high address of Buffer Descriptors Table
                 ; FSR2 low byte calculated below.
 
                 banksel USB_BufferData+wIndex
                 movf    USB_BufferData+wIndex, W, BANKED
-                andlw   0x8F                      ; mask out all but the direction bit 
+                andlw   0x8F                      ; mask out all but the direction bit
                                                   ; and EP number.
                 movwf   FSR2L, ACCESS
                                                   ;D000 EEEE  D -> direction bit, E -> Endpoint bit
-                rlncf   FSR2L, F, ACCESS          ;000E EEED 
+                rlncf   FSR2L, F, ACCESS          ;000E EEED
                 rlncf   FSR2L, F, ACCESS          ;00EE EED0  FSR2L now contains the proper
-                rlncf   FSR2L, F, ACCESS          ;0EEE ED00  offset into the BD table for the 
+                rlncf   FSR2L, F, ACCESS          ;0EEE ED00  offset into the BD table for the
                                                   ;           specified EP
 
                                                   ;ENDPOINT  ADDRESS OFFSET
                                                   ;1 0001    00001D00    8 bytes
                                                   ;2 0010    00010D00    16 bytes
-                                                  ;3 0011    00011D00    24 bytes  
+                                                  ;3 0011    00011D00    24 bytes
 
                 movlw  low BD0OST
                 addwf  FSR2L, F, ACCESS           ; ...into FSR2
                 ifset STATUS, C, ACCESS
                     incf FSR2H, F, ACCESS
                 endi
-                movf  USB_BufferData+wIndex, W, BANKED   ; Get EndPoint 
-                andlw 0x0F                               ; Strip off direction bit leavng 
+                movf  USB_BufferData+wIndex, W, BANKED   ; Get EndPoint
+                andlw 0x0F                               ; Strip off direction bit leavng
                                                          ; only End Point.
                 ifset USB_BufferData+wIndex, 7, BANKED   ; if the specified EP direction is IN...
-                                                         ; add endpoint number to FSR1 address to 
+                                                         ; add endpoint number to FSR1 address to
                                                          ; access relevant UEP* register
-                    andifclr PLUSW1, EPINEN, ACCESS      ; ...and the specified EP is not 
+                    andifclr PLUSW1, EPINEN, ACCESS      ; ...and the specified EP is not
                                                          ; enabled for IN transfers.
                     bsf      USB_error_flags, 0, BANKED  ; set Request Error flag
 
-                elsifclr     USB_BufferData+wIndex, 7, BANKED   
-                andifclr     PLUSW1, EPOUTEN, ACCESS    ; otherwise, if the 
+                elsifclr     USB_BufferData+wIndex, 7, BANKED
+                andifclr     PLUSW1, EPOUTEN, ACCESS    ; otherwise, if the
                                                         ; specified EP direction is OUT
                                                         ; and the specified EP is
                                                         ; not enabled for OUT transfers.
                     bsf      USB_error_flags, 0, BANKED ; set Request Error flag
                 otherwise
-                    movf     INDF2, W                   ; move contents of specified BDndST 
+                    movf     INDF2, W                   ; move contents of specified BDndST
                                                         ; register into WREG
                     andlw    0x04                       ; extract the BSTALL bit
                     movwf    INDF0
                     rrncf    INDF0, F
                     rrncf    INDF0, F                   ; shift BSTALL bit into the lsb position
-                    clrf     PREINC0                                        
+                    clrf     PREINC0
                     banksel  BD0IBC
                     call updateControlTxTwoBytes
                 endi
@@ -716,7 +733,7 @@ StandardRequests
                 endi
                 break
             case CONFIG_STATE
-                movlw high UEP0              ; 
+                movlw high UEP0              ;
                 movwf FSR0H, ACCESS
                 movlw low UEP0
                 movwf FSR0L, ACCESS          ; put UEP0 address into FSR0
@@ -750,7 +767,7 @@ StandardRequests
                             ifl USB_BufferData+bRequest, EQ, CLEAR_FEATURE
                                 clrf  INDF1                    ; clear the stall on the specified EP
                             otherwise
-                                movlw 0x84
+                                movlw SIE_STALL
                                 movwf INDF1                    ; stall the specified EP
                             endi
                         otherwise
@@ -759,10 +776,10 @@ StandardRequests
                     otherwise                                  ; ...otherwise the specified EP direction is OUT, so...
                         ifset INDF0, EPOUTEN, ACCESS           ; if the specified EP is enabled for OUT transfers...
                             ifl USB_BufferData+bRequest, EQ, CLEAR_FEATURE
-                                movlw 0x88
-                                movwf INDF1                    ; clear the stall on the specified EP                                                    
+                                movlw SIE_DTSEN
+                                movwf INDF1                    ; clear the stall on the specified EP
                             otherwise
-                                movlw 0x84
+                                movlw SIE_STALL
                                 movwf INDF1                    ; stall the specified EP
                             endi
                         otherwise
@@ -848,10 +865,10 @@ StandardRequests
                 break
 	    case 3
                 movlw low (String3-Descriptor_begin)
-                break		
+                break
             case 4
                 movlw low (String4-Descriptor_begin)
-                break		
+                break
             default
                 bsf USB_error_flags, 0, BANKED    ; Set Request Error flag
             ends
@@ -878,8 +895,8 @@ StandardRequests
         banksel     BD0IBC
         movlw       0x01
         movwf       BD0IBC, BANKED            ; set EP0 IN byte count to 1
-        movlw       0xC8
-        movwf       BD0IST, BANKED            ; send packet as DATA1, set UOWN bit
+        movlw       SIE_DTS_DTSEN
+        movwf       BD0IST, BANKED            ; Send as DATA1
         break
 
     ; >>>>  STANDARD REQUESTS  <<<< ;
@@ -907,9 +924,9 @@ StandardRequests
                 bsf    PORTB, 3, ACCESS
                 call setupEndpoint1
 		call setupEndpoint2
-		
-		
-		
+
+
+
 #endif
             ends
 
@@ -929,8 +946,8 @@ StandardRequests
                 clrf     INDF0                    ; always send back 0 for bAlternateSetting
                 movlw    0x01
                 movwf    BD0IBC, BANKED            ; set byte count to 1
-                movlw    0xC8
-                movwf    BD0IST, BANKED            ; send packet as DATA1, set UOWN bit
+                movlw    SIE_DTS_DTSEN
+                movwf    BD0IST, BANKED            ; Send as DATA1
                 otherwise
                 bsf      USB_error_flags, 0, BANKED    ; set Request Error flag
             endi
@@ -1041,13 +1058,13 @@ ProcessInToken
     case EP2
         PrintStr EP2InStr
 	;Send something to the host over USB.
-	
-	
+
+
         movlw   low (USB_Buffer+  4*MAX_PACKET_SIZE)
-        movwf   FSR0L, ACCESS     
+        movwf   FSR0L, ACCESS
         movlw   high (USB_Buffer+ 4*MAX_PACKET_SIZE)
         movwf   FSR0H, ACCESS
-	
+
 	movlw   0x41  ; Char 'a'?
         movwf   POSTINC0
 	movlw   0x42  ; Char 'b'?
@@ -1064,20 +1081,17 @@ ProcessInToken
         movwf   POSTINC0
 	movlw   0x00  ; Char '\0'
         movwf   POSTINC0
-	
-	
+
+
 	banksel BD2IBC
 	movlw   8
 	movwf   BD2IBC, BANKED
-	
+
 	movlw     0x40		       ; 0100 0000 DataToggleSync Bit
 	xorwf     BD2IST, W, BANKED    ; Toggle the DATA01 bit
 	andlw     0x40                 ; clear the PIDs bits
-	iorlw     0x88                 ; set UOWN and DTS bits
+	iorlw     SIE_DTSEN            ; set UOWN and DTS bits
 	movwf     BD2IST, BANKED
-	
-	
-	
 	break
     ends
     return
@@ -1093,7 +1107,7 @@ ProcessOutToken
 	banksel BD0OBC
 	movlw   MAX_PACKET_SIZE
 	movwf   BD0OBC, BANKED
-	movlw   0x88
+	movlw   SIE_DTSEN
 	movwf   BD0OST, BANKED
         call updateControlTxZeroBytes
 	break
@@ -1102,21 +1116,38 @@ ProcessOutToken
 	call copyPayloadToBufferData
 	banksel USB_BufferData
         PrintData USB_BufferData
-	
+
 	banksel BD1OBC
 	movlw   MAX_PACKET_SIZE
 	movwf   BD1OBC, BANKED
-	
-;	movlw   0x80   ;  DISABLED SYNCHRONIATION DATA0/DATA1 ETC.
-;	movwf   BD1OST, BANKED
-	
+
 	movlw     0x40		       ; 0100 0000 DataToggleSync Bit
 	xorwf     BD1OST, W, BANKED    ; Toggle the DATA01 bit
 	andlw     0x40                 ; clear the PIDs bits
-	iorlw     0x88                 ; set UOWN and DTS bits
+	iorlw     SIE_DTSEN            ; set UOWN and DTS bits
 	movwf     BD1OST, BANKED
-	
-	
+
+
+       ; TODO this should avoid repetition.
+       ;movf BD10ST, W, BANKED
+       ;call UpdateBufferStatus
+       ;movwf BD10ST, BANKED
+
+
+
+       ;UpdateBufferStatus:
+       ;    XORLW 0x40       ; 0100 0000 DataToggleSync Bit
+       ;    andlw 0x40       ; Toggle the DATA01 bit
+       ;    iorlw SIE_DTSEN  ; clear the PIDs bits
+       ;    return           ; set UOWN and DTS bits
+
+
+
+
+
+
+
+
 	break
     case EP2
 	break
@@ -1155,10 +1186,11 @@ SendDescriptorPacket
         incf  USB_desc_ptr, F, BANKED ; increment the descriptor pointer
         next USB_loop_index
     banksel   BD0IST
+
     movlw     0x40
     xorwf     BD0IST, W, BANKED       ; toggle the DATA01 bit
     andlw     0x40                    ; clear the PIDs bits
-    iorlw     0x88                    ; set UOWN and DTS bits
+    iorlw     SIE_DTSEN               ; set UOWN and DTS bits
     movwf     BD0IST, BANKED
     return
 
@@ -1166,16 +1198,16 @@ SendDescriptorPacket
 updateControlTxTwoBytes:
     movlw   0x02
     movwf   BD0IBC, BANKED ; Setting byte count as 2 bytes
-    movlw   0xC8
-    movwf   BD0IST, BANKED ; Send packet as DATA1, set UOWN bit    
+    movlw   SIE_DTS_DTSEN
+    movwf   BD0IST, BANKED ; Send packet as DATA1, set UOWN bit
     return
 
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 updateControlTxZeroBytes:
     banksel BD0IBC
     clrf    BD0IBC, BANKED                    ; set byte count to 0
-    movlw   0xC8
-    movwf   BD0IST, BANKED ; Send packet as DATA1, set UOWN bit    
+    movlw   SIE_DTS_DTSEN
+    movwf   BD0IST, BANKED ; Send packet as DATA1, set UOWN bit
     return
 
 pointToCtrlEPInputBuffer:
@@ -1184,7 +1216,7 @@ pointToCtrlEPInputBuffer:
     movwf    FSR0H, ACCESS
     movf     BD0IAL, W, BANKED        ; get buffer pointer
     movwf    FSR0L, ACCESS
-    return 
+    return
 
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 copyPayloadToBufferData:
@@ -1210,10 +1242,10 @@ copyPayloadToBufferData:
     movf     POSTINC0, W
     movwf    USB_BufferData+7, BANKED  ; Move received bytes to USB_BufferData
     return
-    
+
 
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-setupEndpoint1:        
+setupEndpoint1:
     banksel BD1OBC
 
     movlw   MAX_PACKET_SIZE       ; 8 bytes lowest packet size for low and high speed.
@@ -1222,16 +1254,16 @@ setupEndpoint1:
     movwf   BD1OAL, BANKED
     movlw   high (USB_Buffer+ 2*MAX_PACKET_SIZE)    ; EP1 OUT gets a buffer...
     movwf   BD1OAH, BANKED
-    movlw   0xC8                  ; set UOWN bit Data1 Data synchronization enabled.
-    movlw   0x88                  ; set UOWN bit (SIE can write)
+    movlw   SIE_DTS_DTSEN         ; set UOWN bit Data1 Data synchronization enabled.
+    movlw   SIE_DTSEN             ; set UOWN bit (SIE can write)
     movwf   BD1OST, BANKED        ; synchronization byte enabled.
 
     movlw   ENDPT_OUT_ONLY        ; EP1 is gets output from host
-    movwf   UEP1, ACCESS          ; 
-    
+    movwf   UEP1, ACCESS          ;
+
     return
-    
-    
+
+
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 setupEndpoint2:
     banksel BD2IBC
@@ -1241,13 +1273,13 @@ setupEndpoint2:
     movwf   BD2IAL, BANKED
     movlw   high (USB_Buffer+ 4*MAX_PACKET_SIZE)    ; EP1 OUT gets a buffer...
     movwf   BD2IAH, BANKED
-    movlw   0x88                  ; Synchronization enabled.
-    movwf   BD2IST, BANKED        ; 
+    movlw   SIE_DTSEN             ; Synchronization enabled.
+    movwf   BD2IST, BANKED        ;
 
     movlw   ENDPT_IN_ONLY        ; EP2 sends the host data
-    movwf   UEP2, ACCESS          ; 
+    movwf   UEP2, ACCESS          ;
     return
-    
+
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 clearNonControlEndPoints:
     clrf    UEP1, ACCESS          ; to disable all endpoints.
@@ -1257,7 +1289,7 @@ clearNonControlEndPoints:
     clrf    UEP5, ACCESS
     clrf    UEP6, ACCESS
     clrf    UEP7, ACCESS
-    clrf    UEP8, ACCESS  
+    clrf    UEP8, ACCESS
     clrf    UEP9, ACCESS
     clrf    UEP10, ACCESS
     clrf    UEP11, ACCESS
@@ -1294,13 +1326,13 @@ InitUSB
     untilclr    UCON, SE0, ACCESS          ;   ...until initial SE0 condition clears.
                                            ;   SE0 == Single Ended Zero
     return
-;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++    
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 Main
     clrf        PORTA,  ACCESS
     movlw       0x0F
     movwf       ADCON1, ACCESS    ; Set up PORTA to be digital I/Os rather than A/D converter.
     clrf        TRISA,  ACCESS    ; Set up all PORTA pins to be digital outputs.
-    
+
     call	InitUsartComms
 
     bcf    RCON, IPEN,   ACCESS          ; Disable priority levels on interrupts.
@@ -1309,16 +1341,16 @@ Main
     bcf    PIE1, TXIE ,  ACCESS          ; Disable transmission interrupts.
 
     PrintStr HELLO_WORLD
-    
+
     call        InitUSB           ; Initialize the USB registers and serial interface engine.
 
     repeat
         call     ServiceUSB       ; Service USB requests...
         banksel  USB_USWSTAT
     until USB_USWSTAT, EQ, CONFIG_STATE  ; ...until the host configures the peripheral
-    
+
     PrintStr PIC_CONFIGURED
-    
+
     bsf         PORTA, 0, ACCESS      ; set RA0 high
     banksel     COUNTER_L
     clrf        COUNTER_L, BANKED
@@ -1350,11 +1382,13 @@ Main
 ;   Do I have the capacitors.
 ;   DO I have the lead for that micro?
 
-    
-    
+
+
     ;Software for pic stored at
     ;/home/martin/Software/PIC/MPLAB_Projects/USB_Proj2/USB_Proj2.X
-    
+
     ;  lsusb  -d 04d8:0014 -v
-    
-    
+
+   ;  The input/output sides of each endpoint have their own buffers.
+   ;  (see how the reset is handled)
+
