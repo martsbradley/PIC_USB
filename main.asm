@@ -59,18 +59,7 @@
 #define    SET_RA0            0x01        ; vendor-specific request to set RA0 to high
 #define    CLR_RA0            0x02        ; vendor-specific request to set RA0 to low
 
-;  uown|dts|ken|incdis|dtsen|bstall|bc9|bc8
-
-;  DTS: Data Toggle Synchronization bit (2)
-;  1 = Data 1 packet
-;  0 = Data 0 packet
-
-;  DTSEN: Data Toggle Synchronization Enable bit
-;  1 = Data toggle synchronization is enabled; data packets with incorrect Sync value will be ignored
-;  except for a SETUP transaction, which is accepted even if the data toggle bits do not match
-;  0 = No data toggle synchronization is performed
-
-; BUFFER STATUS Register
+; USB Buffer Status Register Bits
 #define SIE_DTS_DTSEN  0xC8   ;1100 1000
 #define SIE_DTSEN      0x88   ;1000 1000
 #define SIE_STALL      0x84   ;1000 0100
@@ -85,9 +74,6 @@
     global RS232_Temp_StrLen, RS232_Temp1, RS232_Temp2, RS232_Temp3
     global RS232_Temp4, RS232_Temp5, RS232_Temp6, RS232_Temp7,RS232_Temp8
 
-
-
-;bank0        udata
 mybank1 udata   0x300
 RS232_RINGBUFFER      res SIZE         ;  this should be aligned on a byte.
 RS232_RINGBUFFER_HEAD res 1
@@ -408,7 +394,7 @@ ServiceUSB
         movlw   high (USB_Buffer+MAX_PACKET_SIZE)
         movwf   BD0IAH, BANKED        ; ...set up its address
         movlw   CPU_DTSEN
-        movwf   BD0IST, BANKED        ; Microcontroller owns BD0I
+        movwf   BD0IST, BANKED        ; Microcontroller owns EP0 I
 
         clrf    UADDR, ACCESS         ; set USB Address to 0
         clrf    UIR, ACCESS           ; clear all the USB interrupt flags
@@ -918,16 +904,15 @@ StandardRequests
             default
                 movlw  CONFIG_STATE
                 movwf  USB_USWSTAT, BANKED
+		call setupEndpoint1
+		call setupEndpoint2
+		
 #ifdef SHOW_ENUM_STATUS
                 movlw  0xE0
                 andwf  PORTB, F, ACCESS
-                bsf    PORTB, 3, ACCESS
-                call setupEndpoint1
-		call setupEndpoint2
-
-
-
+                bsf    PORTB, 3, ACCESS                
 #endif
+		
             ends
 
             call updateControlTxZeroBytes
@@ -1059,7 +1044,6 @@ ProcessInToken
         PrintStr EP2InStr
 	;Send something to the host over USB.
 
-
         movlw   low (USB_Buffer+  4*MAX_PACKET_SIZE)
         movwf   FSR0L, ACCESS
         movlw   high (USB_Buffer+ 4*MAX_PACKET_SIZE)
@@ -1081,20 +1065,25 @@ ProcessInToken
         movwf   POSTINC0
 	movlw   0x00  ; Char '\0'
         movwf   POSTINC0
-
-
+	
 	banksel BD2IBC
 	movlw   8
 	movwf   BD2IBC, BANKED
 
-	movlw     0x40		       ; 0100 0000 DataToggleSync Bit
-	xorwf     BD2IST, W, BANKED    ; Toggle the DATA01 bit
-	andlw     0x40                 ; clear the PIDs bits
-	iorlw     SIE_DTSEN            ; set UOWN and DTS bits
-	movwf     BD2IST, BANKED
+        movf BD2IST, W, BANKED
+        call UpdateBufferStatus
+        movwf BD2IST, BANKED
+
 	break
     ends
     return
+
+;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+UpdateBufferStatus:
+    XORLW 0x40       ; 0100 0000 DataToggleSync Bit
+    andlw 0x40       ; Toggle the DATA01 bit
+    iorlw SIE_DTSEN  ; clear the PIDs bits
+    return           ; set UOWN and DTS bits
 
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ;	    Receive data from the Host.
@@ -1120,34 +1109,9 @@ ProcessOutToken
 	banksel BD1OBC
 	movlw   MAX_PACKET_SIZE
 	movwf   BD1OBC, BANKED
-
-	movlw     0x40		       ; 0100 0000 DataToggleSync Bit
-	xorwf     BD1OST, W, BANKED    ; Toggle the DATA01 bit
-	andlw     0x40                 ; clear the PIDs bits
-	iorlw     SIE_DTSEN            ; set UOWN and DTS bits
-	movwf     BD1OST, BANKED
-
-
-       ; TODO this should avoid repetition.
-       ;movf BD10ST, W, BANKED
-       ;call UpdateBufferStatus
-       ;movwf BD10ST, BANKED
-
-
-
-       ;UpdateBufferStatus:
-       ;    XORLW 0x40       ; 0100 0000 DataToggleSync Bit
-       ;    andlw 0x40       ; Toggle the DATA01 bit
-       ;    iorlw SIE_DTSEN  ; clear the PIDs bits
-       ;    return           ; set UOWN and DTS bits
-
-
-
-
-
-
-
-
+        movf BD1OST, W, BANKED
+        call UpdateBufferStatus
+        movwf BD1OST, BANKED
 	break
     case EP2
 	break
@@ -1187,11 +1151,10 @@ SendDescriptorPacket
         next USB_loop_index
     banksel   BD0IST
 
-    movlw     0x40
-    xorwf     BD0IST, W, BANKED       ; toggle the DATA01 bit
-    andlw     0x40                    ; clear the PIDs bits
-    iorlw     SIE_DTSEN               ; set UOWN and DTS bits
-    movwf     BD0IST, BANKED
+    movf BD0IST, W, BANKED
+    call UpdateBufferStatus
+    movwf BD0IST, BANKED
+
     return
 
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -1374,15 +1337,6 @@ Main
     end
 ;  USB Reset sends the device into the default state.
 ;  Default State -> Address State -> Configured State
-
-
-
-;   P18F2550 £4.80 https://coolcomponents.co.uk/products/pic-18f2550-mcu?utm_medium=cpc&utm_source=googlepla&variant=45222867086&gclid=EAIaIQobChMI7KP0mdHk1wIV5p3tCh1kUQI-EAkYASABEgLexfD_BwE
-;   USB MICRO b    https://coolcomponents.co.uk/products/usb-b-socket-breakout-board
-;   Do I have the capacitors.
-;   DO I have the lead for that micro?
-
-
 
     ;Software for pic stored at
     ;/home/martin/Software/PIC/MPLAB_Projects/USB_Proj2/USB_Proj2.X
