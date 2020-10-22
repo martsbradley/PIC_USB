@@ -532,433 +532,450 @@ ProcessSetupToken
             bsf USB_error_flags, 0, BANKED    ; set Request Error flag
     ends
     return
-;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-StandardRequests
-    movf USB_BufferData+bRequest, W, BANKED
+;================================================================================
+StandardRequestGetStatus:
+    ;  The host can ask for the status of the device, an interface or an
+    ;  end point.
+    movf  USB_BufferData+bmRequestType, W, BANKED
+    andlw 0x1F                    ; extract request recipient bits
     select
-
-    ; >>>>  STANDARD REQUESTS  <<<< ;
-    case GET_STATUS
-        ;  The host can ask for the status of the device, an interface or an
-        ;  end point.
-        movf  USB_BufferData+bmRequestType, W, BANKED
-        andlw 0x1F                    ; extract request recipient bits
+    case RECIPIENT_DEVICE
+        call pointToCtrlEPInputBuffer
+        banksel USB_device_status
+        movf    USB_device_status, W, BANKED
+        movwf   POSTINC0                   ; copy device status byte to EP0 buffer
+        clrf    INDF0
+        banksel BD0IBC
+        call updateControlTxTwoBytes
+        break
+    case RECIPIENT_INTERFACE
+        movf USB_USWSTAT, W, BANKED
         select
-        case RECIPIENT_DEVICE
-            call pointToCtrlEPInputBuffer
-            banksel USB_device_status
-            movf    USB_device_status, W, BANKED
-            movwf   POSTINC0                   ; copy device status byte to EP0 buffer
-            clrf    INDF0
-            banksel BD0IBC
-            call updateControlTxTwoBytes
+        case ADDRESS_STATE
+            ; Set Request Error flag
+            bsf USB_error_flags, 0, BANKED
             break
+        case CONFIG_STATE
+            ; Used to return the status of the interface. Such a request to the
+            ; interface should return two bytes of value 0x00.
 
-        case RECIPIENT_INTERFACE
-            movf USB_USWSTAT, W, BANKED
-            select
-            case ADDRESS_STATE
-                ; Set Request Error flag
-                bsf USB_error_flags, 0, BANKED
-                break
-            case CONFIG_STATE
-                ; Used to return the status of the interface. Such a request to the
-                ; interface should return two bytes of value 0x00.
-
-                ifl USB_BufferData+wIndex, LT, NUM_INTERFACES
-                    call pointToCtrlEPInputBuffer
-                    clrf POSTINC0         ;  It is only clearing the two bytes of data.
-                    clrf INDF0            ;  See comment 9 lines above.
-                    call updateControlTxTwoBytes
-                otherwise
-                    ; Host queried state of unknown interface.
-                    bsf USB_error_flags, 0, BANKED ; Set Request Error flag
-                endi
-                break
-            ends
-            break
-        case RECIPIENT_ENDPOINT
-            movf USB_USWSTAT, W, BANKED
-            select
-            case ADDRESS_STATE
-                ;  Returns two bytes indicating the status (Halted/Stalled) of a endpoint
-                movf USB_BufferData+wIndex, W, BANKED ; Get EP
-                andlw 0x0F                             ; Strip off direction bit
-                ifset STATUS, Z, ACCESS                ; see if it is EP0
-                    call pointToCtrlEPInputBuffer
-                    banksel USB_BufferData+wIndex
-
-                    ifset USB_BufferData+wIndex, 7, BANKED ; If the specified direction is IN
-                        banksel  BD0IST
-                        movf     BD0IST, W, BANKED
-                    otherwise
-                        banksel  BD0OST
-                        movf     BD0OST, W, BANKED
-                    endi
-                    andlw 0x04            ; extract the BSTALL bit
-                    movwf INDF0
-                    rrncf INDF0, F
-                    rrncf INDF0, F        ; shift BSTALL bit into the lsb position
-                    clrf  PREINC0
-                    call updateControlTxTwoBytes
-                otherwise
-                    bsf   USB_error_flags, 0, BANKED        ; set Request Error flag
-                endi
-                break
-            case CONFIG_STATE
-
+            ifl USB_BufferData+wIndex, LT, NUM_INTERFACES
                 call pointToCtrlEPInputBuffer
-
-                movlw   high UEP0                   ; put UEP0 address...
-                movwf   FSR1H, ACCESS
-                movlw   low UEP0
-                movwf   FSR1L, ACCESS               ; ...into FSR1
-                movlw   high BD0OST                 ; put BDndST address...
-                movwf   FSR2H, ACCESS
-
-                ; Now ...
-                ; FSR0 contains address of BD0 IN BUFFER data
-                ; FSR1 contains address of UEP0
-                ; FSR2 high byte contains high address of Buffer Descriptors Table
-                ; FSR2 low byte calculated below.
-
+                clrf POSTINC0         ;  It is only clearing the two bytes of data.
+                clrf INDF0            ;  See comment 9 lines above.
+                call updateControlTxTwoBytes
+            otherwise
+                ; Host queried state of unknown interface.
+                bsf USB_error_flags, 0, BANKED ; Set Request Error flag
+            endi
+            break
+        ends
+        break
+    case RECIPIENT_ENDPOINT
+        movf USB_USWSTAT, W, BANKED
+        select
+        case ADDRESS_STATE
+            ;  Returns two bytes indicating the status (Halted/Stalled) of a endpoint
+            movf USB_BufferData+wIndex, W, BANKED ; Get EP
+            andlw 0x0F                             ; Strip off direction bit
+            ifset STATUS, Z, ACCESS                ; see if it is EP0
+                call pointToCtrlEPInputBuffer
                 banksel USB_BufferData+wIndex
-                movf    USB_BufferData+wIndex, W, BANKED
-                andlw   0x8F                      ; mask out all but the direction bit
-                                                  ; and EP number.
-                movwf   FSR2L, ACCESS
-                                                  ;D000 EEEE  D -> direction bit, E -> Endpoint bit
-                rlncf   FSR2L, F, ACCESS          ;000E EEED
-                rlncf   FSR2L, F, ACCESS          ;00EE EED0  FSR2L now contains the proper
-                rlncf   FSR2L, F, ACCESS          ;0EEE ED00  offset into the BD table for the
-                                                  ;           specified EP
 
-                                                  ;ENDPOINT  ADDRESS OFFSET
-                                                  ;1 0001    00001D00    8 bytes
-                                                  ;2 0010    00010D00    16 bytes
-                                                  ;3 0011    00011D00    24 bytes
-
-                movlw  low BD0OST
-                addwf  FSR2L, F, ACCESS           ; ...into FSR2
-                ifset STATUS, C, ACCESS
-                    incf FSR2H, F, ACCESS
-                endi
-                movf  USB_BufferData+wIndex, W, BANKED   ; Get EndPoint
-                andlw 0x0F                               ; Strip off direction bit leavng
-                                                         ; only End Point.
-                ifset USB_BufferData+wIndex, 7, BANKED   ; if the specified EP direction is IN...
-                                                         ; add endpoint number to FSR1 address to
-                                                         ; access relevant UEP* register
-                    andifclr PLUSW1, EPINEN, ACCESS      ; ...and the specified EP is not
-                                                         ; enabled for IN transfers.
-                    bsf      USB_error_flags, 0, BANKED  ; set Request Error flag
-
-                elsifclr     USB_BufferData+wIndex, 7, BANKED
-                andifclr     PLUSW1, EPOUTEN, ACCESS    ; otherwise, if the
-                                                        ; specified EP direction is OUT
-                                                        ; and the specified EP is
-                                                        ; not enabled for OUT transfers.
-                    bsf      USB_error_flags, 0, BANKED ; set Request Error flag
+                ifset USB_BufferData+wIndex, 7, BANKED ; If the specified direction is IN
+                    banksel  BD0IST
+                    movf     BD0IST, W, BANKED
                 otherwise
-                    movf     INDF2, W                   ; move contents of specified BDndST
-                                                        ; register into WREG
-                    andlw    0x04                       ; extract the BSTALL bit
-                    movwf    INDF0
-                    rrncf    INDF0, F
-                    rrncf    INDF0, F                   ; shift BSTALL bit into the lsb position
-                    clrf     PREINC0
-                    banksel  BD0IBC
-                    call updateControlTxTwoBytes
+                    banksel  BD0OST
+                    movf     BD0OST, W, BANKED
                 endi
-                break
-            default
-                bsf USB_error_flags, 0, BANKED    ; set Request Error flag
-            ends
+                andlw 0x04            ; extract the BSTALL bit
+                movwf INDF0
+                rrncf INDF0, F
+                rrncf INDF0, F        ; shift BSTALL bit into the lsb position
+                clrf  PREINC0
+                call updateControlTxTwoBytes
+            otherwise
+                bsf   USB_error_flags, 0, BANKED        ; set Request Error flag
+            endi
+            break
+        case CONFIG_STATE
+            call pointToCtrlEPInputBuffer
+
+            movlw   high UEP0                   ; put UEP0 address...
+            movwf   FSR1H, ACCESS
+            movlw   low UEP0
+            movwf   FSR1L, ACCESS               ; ...into FSR1
+            movlw   high BD0OST                 ; put BDndST address...
+            movwf   FSR2H, ACCESS
+
+            ; Now ...
+            ; FSR0 contains address of BD0 IN BUFFER data
+            ; FSR1 contains address of UEP0
+            ; FSR2 high byte contains high address of Buffer Descriptors Table
+            ; FSR2 low byte calculated below.
+
+            banksel USB_BufferData+wIndex
+            movf    USB_BufferData+wIndex, W, BANKED
+            andlw   0x8F                      ; mask out all but the direction bit
+                                              ; and EP number.
+            movwf   FSR2L, ACCESS
+                                              ;D000 EEEE  D -> direction bit, E -> Endpoint bit
+            rlncf   FSR2L, F, ACCESS          ;000E EEED
+            rlncf   FSR2L, F, ACCESS          ;00EE EED0  FSR2L now contains the proper
+            rlncf   FSR2L, F, ACCESS          ;0EEE ED00  offset into the BD table for the
+                                              ;           specified EP
+
+                                              ;ENDPOINT  ADDRESS OFFSET
+                                              ;1 0001    00001D00    8 bytes
+                                              ;2 0010    00010D00    16 bytes
+                                              ;3 0011    00011D00    24 bytes
+
+            movlw  low BD0OST
+            addwf  FSR2L, F, ACCESS           ; ...into FSR2
+            ifset STATUS, C, ACCESS
+                incf FSR2H, F, ACCESS
+            endi
+            movf  USB_BufferData+wIndex, W, BANKED   ; Get EndPoint
+            andlw 0x0F                               ; Strip off direction bit leavng
+                                                     ; only End Point.
+            ifset USB_BufferData+wIndex, 7, BANKED   ; if the specified EP direction is IN...
+                                                     ; add endpoint number to FSR1 address to
+                                                     ; access relevant UEP* register
+                andifclr PLUSW1, EPINEN, ACCESS      ; ...and the specified EP is not
+                                                     ; enabled for IN transfers.
+                bsf      USB_error_flags, 0, BANKED  ; set Request Error flag
+
+            elsifclr     USB_BufferData+wIndex, 7, BANKED
+            andifclr     PLUSW1, EPOUTEN, ACCESS    ; otherwise, if the
+                                                    ; specified EP direction is OUT
+                                                    ; and the specified EP is
+                                                    ; not enabled for OUT transfers.
+                bsf      USB_error_flags, 0, BANKED ; set Request Error flag
+            otherwise
+                movf     INDF2, W                   ; move contents of specified BDndST
+                                                    ; register into WREG
+                andlw    0x04                       ; extract the BSTALL bit
+                movwf    INDF0
+                rrncf    INDF0, F
+                rrncf    INDF0, F                   ; shift BSTALL bit into the lsb position
+                clrf     PREINC0
+                banksel  BD0IBC
+                call updateControlTxTwoBytes
+            endi
             break
         default
             bsf USB_error_flags, 0, BANKED    ; set Request Error flag
         ends
-    break
-
-    ; >>>>  STANDARD REQUESTS  <<<< ;
-    case CLEAR_FEATURE
-    case SET_FEATURE
-        movf USB_BufferData+bmRequestType, W, BANKED
-        andlw 0x1F                    ; extract request recipient bits
+        break
+    default
+        bsf USB_error_flags, 0, BANKED    ; set Request Error flag
+    ends
+   return
+;================================================================================
+StandardRequestSetFeature:
+    movf USB_BufferData+bmRequestType, W, BANKED
+    andlw 0x1F                    ; extract request recipient bits
+    select
+    case RECIPIENT_DEVICE
+        ; This device only handles remote wakeup.
+        movf USB_BufferData+wValue, W, BANKED
         select
-        case RECIPIENT_DEVICE
-            ; This device only handles remote wakeup.
-            movf USB_BufferData+wValue, W, BANKED
-            select
-            case DEVICE_REMOTE_WAKEUP
-                ifl USB_BufferData+bRequest, EQ, CLEAR_FEATURE
-                    bcf  USB_device_status, 1, BANKED
-                otherwise
-                    bsf  USB_device_status, 1, BANKED
+        case DEVICE_REMOTE_WAKEUP
+            ifl USB_BufferData+bRequest, EQ, CLEAR_FEATURE
+                bcf  USB_device_status, 1, BANKED
+            otherwise
+                bsf  USB_device_status, 1, BANKED
+            endi
+            call updateControlTxZeroBytes
+            break
+        default
+            bsf   USB_error_flags, 0, BANKED        ; set Request Error flag
+        ends
+        break
+    case RECIPIENT_ENDPOINT
+        movf USB_USWSTAT, W, BANKED
+        select
+        case ADDRESS_STATE
+            ;  In Address state only can handle endpoint zero.
+            movf  USB_BufferData+wIndex, W, BANKED    ; get EP
+            andlw 0x0F                                 ; strip off direction bit
+            ifset STATUS, Z, ACCESS                    ; see if it is EP0
+                call updateControlTxZeroBytes
+            otherwise
+                bsf USB_error_flags, 0, BANKED         ; set Request Error flag
+            endi
+            break
+        case CONFIG_STATE
+            movlw high UEP0              ;
+            movwf FSR0H, ACCESS
+            movlw low UEP0
+            movwf FSR0L, ACCESS          ; put UEP0 address into FSR0
+
+            movlw high BD0OST            ; ...
+            movwf FSR1H, ACCESS
+            movlw low BD0OST
+            movwf FSR1L, ACCESS          ; put BD0OST address into FSR1
+
+            movf  USB_BufferData+wIndex, W, BANKED   ; get EP
+            andlw 0x0F                                ; strip off direction bit
+            ifclr STATUS, Z, ACCESS                   ; if it was not EP0...
+                addwf FSR0L, F, ACCESS                ; add EP number to FSR0
+                ifset STATUS, C, ACCESS
+                    incf FSR0H, F, ACCESS
                 endi
+                ; Now FSR0 has the address of the relevant UEPn register.
+
+                rlncf USB_BufferData+wIndex, F, BANKED
+                rlncf USB_BufferData+wIndex, F, BANKED
+                rlncf USB_BufferData+wIndex, W, BANKED   ; WREG now contains the proper offset into the BD table for the specified EP
+                andlw 0x7C                                ; mask out all but the direction bit and EP number (after three left rotates)
+                addwf FSR1L, F, ACCESS                    ; add BD table offset to FSR1
+                ifset STATUS, C, ACCESS
+                    incf FSR1H, F, ACCESS
+                endi
+                ; Now FSR1 has the address of the Buffer descriptor.
+
+                ifset USB_BufferData+wIndex, 1, BANKED    ; if the specified EP direction (now bit 1) is IN...
+                    ifset INDF0, EPINEN, ACCESS            ; if the specified EP is enabled for IN transfers...
+                        ifl USB_BufferData+bRequest, EQ, CLEAR_FEATURE
+                            clrf  INDF1                    ; clear the stall on the specified EP
+                        otherwise
+                            movlw SIE_STALL
+                            movwf INDF1                    ; stall the specified EP
+                        endi
+                    otherwise
+                        bsf USB_error_flags, 0, BANKED     ; set Request Error flag
+                    endi
+                otherwise                                  ; ...otherwise the specified EP direction is OUT, so...
+                    ifset INDF0, EPOUTEN, ACCESS           ; if the specified EP is enabled for OUT transfers...
+                        ifl USB_BufferData+bRequest, EQ, CLEAR_FEATURE
+                            movlw SIE_DTSEN
+                            movwf INDF1                    ; clear the stall on the specified EP
+                        otherwise
+                            movlw SIE_STALL
+                            movwf INDF1                    ; stall the specified EP
+                        endi
+                    otherwise
+                        bsf USB_error_flags, 0, BANKED     ; set Request Error flag
+                    endi
+                endi
+            endi
+            ifclr USB_error_flags, 0, BANKED    ; if there was no Request Error...
+                call updateControlTxZeroBytes
+            endi
+            break
+        default
+            bsf            USB_error_flags, 0, BANKED    ; set Request Error flag
+        ends
+        break
+    default
+        bsf USB_error_flags, 0, BANKED    ; set Request Error flag
+    ends
+   return
+;================================================================================
+StandardRequestSetAddress:
+   ifset USB_BufferData+wValue, 7, BANKED        ; if new device address is illegal, send Request Error
+       bsf USB_error_flags, 0, BANKED    ; set Request Error flag
+   otherwise
+       PrintStr REQ_SET_DEVICE_ADDRESS_STR
+       movlw   SET_ADDRESS
+       movwf   USB_dev_req, BANKED           ; processing a set address request
+       movf    USB_BufferData+wValue, W, BANKED
+       movwf   USB_address_pending, BANKED   ; save new address
+       call updateControlTxZeroBytes
+   endi
+   return
+;================================================================================
+StandardRequestGetDescriptor:
+   movwf USB_dev_req, BANKED                ; processing a GET_DESCRIPTOR request
+   movf  USB_BufferData+(wValue+1), W, BANKED
+   select
+   case DEVICE
+       PrintStr GET_DEVICE_DESCRIPTOR_STR
+       movlw low (Device-Descriptor_begin)
+       movwf USB_desc_ptr, BANKED
+       call  getDescriptorByte                ; get descriptor length
+       movwf USB_bytes_left, BANKED
+       call Update_USB_bytes_left
+       call SendDescriptorPacket
+       break
+
+   case CONFIGURATION
+       PrintStr GET_CONFIG_DESCRIPTOR_STR
+       movf USB_BufferData+wValue, W, BANKED
+       select
+       case 0
+           movlw low (Configuration1-Descriptor_begin)
+           break
+       default
+           bsf USB_error_flags, 0, BANKED    ; set Request Error flag
+       ends
+       ifclr USB_error_flags, 0, BANKED
+           addlw 0x02                ; add offset for wTotalLength
+           movwf USB_desc_ptr, BANKED
+           call getDescriptorByte            ; get total descriptor length
+           movwf USB_bytes_left, BANKED
+           movlw 0x02
+           subwf USB_desc_ptr, F, BANKED    ; subtract offset for wTotalLength
+           call Update_USB_bytes_left
+           call SendDescriptorPacket
+       endi
+       break
+   case STRING
+       PrintStr GET_STRING_DESCRIPTOR_STR
+       movf USB_BufferData+wValue, W, BANKED
+       select
+       case 0
+           movlw low (String0-Descriptor_begin)
+           break
+       case 1
+           movlw low (String1-Descriptor_begin)
+           break
+       case 2
+           movlw low (String2-Descriptor_begin)
+           break
+       case 3
+           movlw low (String3-Descriptor_begin)
+           break
+       case 4
+           movlw low (String4-Descriptor_begin)
+           break
+       default
+           bsf USB_error_flags, 0, BANKED    ; Set Request Error flag
+       ends
+
+       ifclr USB_error_flags, 0, BANKED
+           movwf        USB_desc_ptr, BANKED
+           call  getDescriptorByte        ; get descriptor length
+           movwf USB_bytes_left, BANKED
+           call Update_USB_bytes_left
+           call SendDescriptorPacket
+       endi
+       break
+   default
+       bsf  USB_error_flags, 0, BANKED    ; set Request Error flag
+   ends
+   return
+;================================================================================
+StandardRequestGetConfiguration:
+    call pointToCtrlEPInputBuffer
+    banksel     USB_curr_config
+    movf        USB_curr_config, W, BANKED
+    movwf       INDF0                    ; copy current device configuration to EP0 IN buffer
+    banksel     BD0IBC
+    movlw       0x01
+    movwf       BD0IBC, BANKED            ; set EP0 IN byte count to 1
+    movlw       SIE_DTS_DTSEN
+    movwf       BD0IST, BANKED            ; Send as DATA1
+    return
+;================================================================================
+StandardRequestSetConfiguration:
+    ifl USB_BufferData+wValue, LE, NUM_CONFIGURATIONS
+        call clearNonControlEndPoints
+        movf  USB_BufferData+wValue, W, BANKED
+        movwf USB_curr_config, BANKED
+        select
+        case 0
+            movlw  ADDRESS_STATE
+            movwf  USB_USWSTAT, BANKED
+#ifdef SHOW_ENUM_STATUS
+            movlw  0xE0
+            andwf  PORTB, F, ACCESS
+            bsf    PORTB, 2, ACCESS
+#endif
+            break
+        default
+            movlw  CONFIG_STATE
+            movwf  USB_USWSTAT, BANKED
+            call setupEndpoint1
+            call setupEndpoint2
+
+#ifdef SHOW_ENUM_STATUS
+            movlw  0xE0
+            andwf  PORTB, F, ACCESS
+            bsf    PORTB, 3, ACCESS
+#endif
+
+        ends
+
+        call updateControlTxZeroBytes
+    otherwise
+        PrintStr SET_CONFIG_ERR_STR
+        bsf     USB_error_flags, 0, BANKED    ; set Request Error flag
+    endi
+    return
+;================================================================================
+StandardRequestGetInterface
+    movf        USB_USWSTAT, W, BANKED
+    select
+    case CONFIG_STATE
+        ifl USB_BufferData+wIndex, LT, NUM_INTERFACES
+            call pointToCtrlEPInputBuffer
+            clrf     INDF0                    ; always send back 0 for bAlternateSetting
+            movlw    0x01
+            movwf    BD0IBC, BANKED            ; set byte count to 1
+            movlw    SIE_DTS_DTSEN
+            movwf    BD0IST, BANKED            ; Send as DATA1
+            otherwise
+            bsf      USB_error_flags, 0, BANKED    ; set Request Error flag
+        endi
+        break
+    default
+        bsf  USB_error_flags, 0, BANKED    ; set Request Error flag
+    ends
+    return
+;================================================================================
+StandardRequestSetInterface:
+    movf  USB_USWSTAT, W, BANKED
+    select
+    case CONFIG_STATE
+        ifl USB_BufferData+wIndex, LT, NUM_INTERFACES
+            movf  USB_BufferData+wValue, W, BANKED
+            select
+            case 0                                    ; currently support only bAlternateSetting of 0
                 call updateControlTxZeroBytes
                 break
             default
-                bsf   USB_error_flags, 0, BANKED        ; set Request Error flag
+                bsf     USB_error_flags, 0, BANKED    ; set Request Error flag
             ends
-            break
-        case RECIPIENT_ENDPOINT
-            movf USB_USWSTAT, W, BANKED
-            select
-            case ADDRESS_STATE
-                ;  In Address state only can handle endpoint zero.
-                movf  USB_BufferData+wIndex, W, BANKED    ; get EP
-                andlw 0x0F                                 ; strip off direction bit
-                ifset STATUS, Z, ACCESS                    ; see if it is EP0
-                    call updateControlTxZeroBytes
-                otherwise
-                    bsf USB_error_flags, 0, BANKED         ; set Request Error flag
-                endi
-                break
-            case CONFIG_STATE
-                movlw high UEP0              ;
-                movwf FSR0H, ACCESS
-                movlw low UEP0
-                movwf FSR0L, ACCESS          ; put UEP0 address into FSR0
-
-                movlw high BD0OST            ; ...
-                movwf FSR1H, ACCESS
-                movlw low BD0OST
-                movwf FSR1L, ACCESS          ; put BD0OST address into FSR1
-
-                movf  USB_BufferData+wIndex, W, BANKED   ; get EP
-                andlw 0x0F                                ; strip off direction bit
-                ifclr STATUS, Z, ACCESS                   ; if it was not EP0...
-                    addwf FSR0L, F, ACCESS                ; add EP number to FSR0
-                    ifset STATUS, C, ACCESS
-                        incf FSR0H, F, ACCESS
-                    endi
-                    ; Now FSR0 has the address of the relevant UEPn register.
-
-                    rlncf USB_BufferData+wIndex, F, BANKED
-                    rlncf USB_BufferData+wIndex, F, BANKED
-                    rlncf USB_BufferData+wIndex, W, BANKED   ; WREG now contains the proper offset into the BD table for the specified EP
-                    andlw 0x7C                                ; mask out all but the direction bit and EP number (after three left rotates)
-                    addwf FSR1L, F, ACCESS                    ; add BD table offset to FSR1
-                    ifset STATUS, C, ACCESS
-                        incf FSR1H, F, ACCESS
-                    endi
-                    ; Now FSR1 has the address of the Buffer descriptor.
-
-                    ifset USB_BufferData+wIndex, 1, BANKED    ; if the specified EP direction (now bit 1) is IN...
-                        ifset INDF0, EPINEN, ACCESS            ; if the specified EP is enabled for IN transfers...
-                            ifl USB_BufferData+bRequest, EQ, CLEAR_FEATURE
-                                clrf  INDF1                    ; clear the stall on the specified EP
-                            otherwise
-                                movlw SIE_STALL
-                                movwf INDF1                    ; stall the specified EP
-                            endi
-                        otherwise
-                            bsf USB_error_flags, 0, BANKED     ; set Request Error flag
-                        endi
-                    otherwise                                  ; ...otherwise the specified EP direction is OUT, so...
-                        ifset INDF0, EPOUTEN, ACCESS           ; if the specified EP is enabled for OUT transfers...
-                            ifl USB_BufferData+bRequest, EQ, CLEAR_FEATURE
-                                movlw SIE_DTSEN
-                                movwf INDF1                    ; clear the stall on the specified EP
-                            otherwise
-                                movlw SIE_STALL
-                                movwf INDF1                    ; stall the specified EP
-                            endi
-                        otherwise
-                            bsf USB_error_flags, 0, BANKED     ; set Request Error flag
-                        endi
-                    endi
-                endi
-                ifclr USB_error_flags, 0, BANKED    ; if there was no Request Error...
-                    call updateControlTxZeroBytes
-                endi
-                break
-            default
-                bsf            USB_error_flags, 0, BANKED    ; set Request Error flag
-            ends
-            break
-        default
-            bsf USB_error_flags, 0, BANKED    ; set Request Error flag
-        ends
+        otherwise
+            bsf  USB_error_flags, 0, BANKED    ; set Request Error flag
+        endi
         break
+    default
+        bsf USB_error_flags, 0, BANKED    ; set Request Error flag
+    ends
+    return
+;================================================================================
+StandardRequests
+    movf USB_BufferData+bRequest, W, BANKED
 
-    ; >>>>  STANDARD REQUESTS  <<<< ;
+    select
+    case GET_STATUS
+        call StandardRequestGetStatus
+        break
+    case CLEAR_FEATURE
+    case SET_FEATURE
+        call StandardRequestSetFeature
+        break
     case SET_ADDRESS
-        ifset USB_BufferData+wValue, 7, BANKED        ; if new device address is illegal, send Request Error
-            bsf USB_error_flags, 0, BANKED    ; set Request Error flag
-        otherwise
-            PrintStr REQ_SET_DEVICE_ADDRESS_STR
-            movlw   SET_ADDRESS
-            movwf   USB_dev_req, BANKED           ; processing a set address request
-            movf    USB_BufferData+wValue, W, BANKED
-            movwf   USB_address_pending, BANKED   ; save new address
-            call updateControlTxZeroBytes
-        endi
-    break
-
-    ; >>>>  STANDARD REQUESTS  <<<< ;
+        call StandardRequestSetAddress
+        break
     case GET_DESCRIPTOR
-        movwf USB_dev_req, BANKED                ; processing a GET_DESCRIPTOR request
-        movf  USB_BufferData+(wValue+1), W, BANKED
-        select
-        case DEVICE
-            PrintStr GET_DEVICE_DESCRIPTOR_STR
-            movlw low (Device-Descriptor_begin)
-            movwf USB_desc_ptr, BANKED
-            call  getDescriptorByte                ; get descriptor length
-            movwf USB_bytes_left, BANKED
-            call Update_USB_bytes_left
-            call SendDescriptorPacket
-            break
-
-        case CONFIGURATION
-            PrintStr GET_CONFIG_DESCRIPTOR_STR
-            movf USB_BufferData+wValue, W, BANKED
-            select
-            case 0
-                movlw low (Configuration1-Descriptor_begin)
-                break
-            default
-                bsf USB_error_flags, 0, BANKED    ; set Request Error flag
-            ends
-            ifclr USB_error_flags, 0, BANKED
-                addlw 0x02                ; add offset for wTotalLength
-                movwf USB_desc_ptr, BANKED
-                call getDescriptorByte            ; get total descriptor length
-                movwf USB_bytes_left, BANKED
-                movlw 0x02
-                subwf USB_desc_ptr, F, BANKED    ; subtract offset for wTotalLength
-                call Update_USB_bytes_left
-                call SendDescriptorPacket
-            endi
-            break
-        case STRING
-            PrintStr GET_STRING_DESCRIPTOR_STR
-            movf USB_BufferData+wValue, W, BANKED
-            select
-            case 0
-                movlw low (String0-Descriptor_begin)
-                break
-            case 1
-                movlw low (String1-Descriptor_begin)
-                break
-            case 2
-                movlw low (String2-Descriptor_begin)
-                break
-	    case 3
-                movlw low (String3-Descriptor_begin)
-                break
-            case 4
-                movlw low (String4-Descriptor_begin)
-                break
-            default
-                bsf USB_error_flags, 0, BANKED    ; Set Request Error flag
-            ends
-
-            ifclr USB_error_flags, 0, BANKED
-                movwf        USB_desc_ptr, BANKED
-                call  getDescriptorByte        ; get descriptor length
-                movwf USB_bytes_left, BANKED
-                call Update_USB_bytes_left
-                call SendDescriptorPacket
-            endi
-            break
-        default
-            bsf  USB_error_flags, 0, BANKED    ; set Request Error flag
-        ends
+        call StandardRequestGetDescriptor
         break
-
-    ; >>>>  STANDARD REQUESTS  <<<< ;
     case GET_CONFIGURATION
-        call pointToCtrlEPInputBuffer
-        banksel     USB_curr_config
-        movf        USB_curr_config, W, BANKED
-        movwf       INDF0                    ; copy current device configuration to EP0 IN buffer
-        banksel     BD0IBC
-        movlw       0x01
-        movwf       BD0IBC, BANKED            ; set EP0 IN byte count to 1
-        movlw       SIE_DTS_DTSEN
-        movwf       BD0IST, BANKED            ; Send as DATA1
+        call StandardRequestGetConfiguration
         break
-
-    ; >>>>  STANDARD REQUESTS  <<<< ;
     case SET_CONFIGURATION
-        ifl USB_BufferData+wValue, LE, NUM_CONFIGURATIONS
-            call clearNonControlEndPoints
-            movf  USB_BufferData+wValue, W, BANKED
-            movwf USB_curr_config, BANKED
-            select
-            case 0
-                movlw  ADDRESS_STATE
-                movwf  USB_USWSTAT, BANKED
-#ifdef SHOW_ENUM_STATUS
-                movlw  0xE0
-                andwf  PORTB, F, ACCESS
-                bsf    PORTB, 2, ACCESS
-#endif
-                break
-            default
-                movlw  CONFIG_STATE
-                movwf  USB_USWSTAT, BANKED
-		call setupEndpoint1
-		call setupEndpoint2
-
-#ifdef SHOW_ENUM_STATUS
-                movlw  0xE0
-                andwf  PORTB, F, ACCESS
-                bsf    PORTB, 3, ACCESS
-#endif
-
-            ends
-
-            call updateControlTxZeroBytes
-        otherwise
-            PrintStr SET_CONFIG_ERR_STR
-            bsf     USB_error_flags, 0, BANKED    ; set Request Error flag
-        endi
+        call StandardRequestSetConfiguration
         break
-    ; >>>>  STANDARD REQUESTS  <<<< ;
     case GET_INTERFACE
-        movf        USB_USWSTAT, W, BANKED
-        select
-        case CONFIG_STATE
-            ifl USB_BufferData+wIndex, LT, NUM_INTERFACES
-                call pointToCtrlEPInputBuffer
-                clrf     INDF0                    ; always send back 0 for bAlternateSetting
-                movlw    0x01
-                movwf    BD0IBC, BANKED            ; set byte count to 1
-                movlw    SIE_DTS_DTSEN
-                movwf    BD0IST, BANKED            ; Send as DATA1
-                otherwise
-                bsf      USB_error_flags, 0, BANKED    ; set Request Error flag
-            endi
-            break
-        default
-            bsf  USB_error_flags, 0, BANKED    ; set Request Error flag
-        ends
+        call StandardRequestGetInterface
         break
-    ; >>>>  STANDARD REQUESTS  <<<< ;
     case SET_INTERFACE
-        movf  USB_USWSTAT, W, BANKED
-        select
-        case CONFIG_STATE
-            ifl USB_BufferData+wIndex, LT, NUM_INTERFACES
-                movf  USB_BufferData+wValue, W, BANKED
-                select
-                case 0                                    ; currently support only bAlternateSetting of 0
-                    call updateControlTxZeroBytes
-                    break
-                default
-                    bsf     USB_error_flags, 0, BANKED    ; set Request Error flag
-                ends
-            otherwise
-                bsf  USB_error_flags, 0, BANKED    ; set Request Error flag
-            endi
-            break
-        default
-            bsf USB_error_flags, 0, BANKED    ; set Request Error flag
-        ends
+        call StandardRequestSetInterface
         break
     case SET_DESCRIPTOR
     case SYNCH_FRAME
@@ -988,7 +1005,6 @@ VendorRequests
     case CLR_RA0
         bcf         PORTA, 0, ACCESS        ; set RA0 low
         call updateControlTxZeroBytes
-
         break
     default
         bsf         USB_error_flags, 0, BANKED    ; set Request Error flag
@@ -1151,7 +1167,6 @@ SendDescriptorPacket
     movf BD0IST, W, BANKED
     call UpdateBufferStatus
     movwf BD0IST, BANKED
-
     return
 
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
