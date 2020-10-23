@@ -333,53 +333,6 @@ Descriptor_end
 
 ServiceUSB
     select
-    caseset    UIR, UERRIF, ACCESS    ;  If there is an interrupt.
-        clrf   UEIR, ACCESS           ;  Clear the error in software.
-        break
-    caseset    UIR, SOFIF, ACCESS     ;  Start of Frame token received by SIE
-        bcf    UIR, SOFIF, ACCESS     ;  Clear this flag
-        break
-    caseset    UIR,  IDLEIF, ACCESS   ;  Idle condition detected (been idle for 3ms or more)
-        bcf    UIR,  IDLEIF, ACCESS   ;  Clear that idle condition.
-        bsf    UCON, SUSPND, ACCESS   ;  Suspend the SIE to conserve power.
-#ifdef SHOW_ENUM_STATUS
-        movlw  0xE0                   ;  0b11100000 -> W
-        andwf  PORTB, F, ACCESS       ;  AND 0xE0 with PORTB and store in PORTB
-        bsf    PORTB, 4, ACCESS       ;  Also set bit 4 of PORTB
-#endif
-	PrintStr IDLE_CONDITION
-        break
-    caseset UIR, ACTVIF, ACCESS       ;  There was activity on the USB
-        bcf    UIR, ACTVIF, ACCESS    ;  Clear the activity detection flag.
-        bcf    UCON, SUSPND, ACCESS   ;  Unsuspend the SIE.
-    #ifdef SHOW_ENUM_STATUS
-        movlw   0xE0
-        andwf   PORTB, F, ACCESS
-        banksel USB_USWSTAT
-        movf    USB_USWSTAT, W, BANKED  ; Load current state into W.
-        select
-        case POWERED_STATE
-	    PrintStr POWERED_STATE_STR
-            movlw    0x01
-            break
-        case DEFAULT_STATE
-	    PrintStr DEFAULT_STATE_STR
-            movlw    0x02
-            break
-        case ADDRESS_STATE
-	    PrintStr ADDRESS_STATE_STR
-            movlw    0x04
-            break
-        case CONFIG_STATE
-            movlw    0x08
-        ends
-        iorwf  PORTB, F, ACCESS        ;  Update the port to reflect the state.
-#endif
-        break
-    caseset     UIR, STALLIF, ACCESS  ; A stall handshake was sent by the SIE
-        bcf     UIR, STALLIF, ACCESS  ; clear the stall handshake
-	PrintStr STALL_HANDSHAKE_STR
-        break
     caseset UIR, URSTIF, ACCESS    ; USB Reset occurred.
 	PrintStr USB_RESET_STR
 
@@ -1316,7 +1269,11 @@ clearNonControlEndPoints:
 
 InitUSB
     PrintStr USB_INITIALISED
-    clrf        UIE, ACCESS                ; USB Interrupt Enable register - Mask all USB interrupts
+    ;clrf        UIE, ACCESS                ; USB Interrupt Enable register - Mask all USB interrupts
+    
+    movlw       0x76           ;SOFIE STALLIE IDLEIE ACTVIE & UERRIE enabled
+    movwf       UIE, ACCESS 
+    
     clrf        UIR, ACCESS                ; USB Interrupt Status register - Clear all interrupt flags
     movlw       0x14                       ; UPUEN  = 1 On-chip pull-up on D+, so full speed.
     ; UTRDIS = 1 On-chip transceiver enabled.
@@ -1387,14 +1344,3 @@ Main
     forever
 
     end
-;  USB Reset sends the device into the default state.
-;  Default State -> Address State -> Configured State
-
-    ;Software for pic stored at
-    ;/home/martin/Software/PIC/MPLAB_Projects/USB_Proj2/USB_Proj2.X
-
-    ;  lsusb  -d 04d8:0014 -v
-
-   ;  The input/output sides of each endpoint have their own buffers.
-   ;  (see how the reset is handled)
-

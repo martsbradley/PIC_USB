@@ -65,10 +65,34 @@ InterruptTransmitRS232Ready:
     btfss PIR1, TXIF, ACCESS ;skip if TXIF == 1 means ready to send another byte.
     goto InterruptServiceEnd
 
-    btfss PIE1, TXIE, ACCESS ;skip if TXIE == 1 because transmission enabled.
-    goto InterruptServiceEnd
+    btfsc PIE1, TXIE, ACCESS ;skip if TXIE == 0 because transmission disabled.
+    goto SendRS232
     
-SendRS232FromData:
+    
+USBInterruptCheck:    
+    select
+    caseset    UIR, UERRIF, ACCESS    ;  If an Error Condition Interrupt.
+        clrf   UEIR, ACCESS           ;  Clear the error in software.
+        break
+    caseset    UIR, SOFIF, ACCESS     ;  Start of Frame token received by SIE
+        bcf    UIR, SOFIF, ACCESS     ;  Clear this flag
+        break
+    caseset    UIR, STALLIF, ACCESS   ; A stall handshake was sent by the SIE
+        bcf    UIR, STALLIF, ACCESS   ; clear the stall handshake
+        break	
+    caseset    UIR,  IDLEIF, ACCESS   ;  Idle condition detected (been idle for 3ms or more)
+        bcf    UIR,  IDLEIF, ACCESS   ;  Clear that idle condition.
+        bsf    UCON, SUSPND, ACCESS   ;  Suspend the SIE to conserve power.
+        break
+    caseset UIR, ACTVIF, ACCESS       ;  There was activity on the USB
+        bcf    UIR, ACTVIF, ACCESS    ;  Clear the activity detection flag.
+        bcf    UCON, SUSPND, ACCESS   ;  Unsuspend the SIE.
+        break
+     ends
+     goto InterruptServiceEnd
+    
+    
+SendRS232:
     call  RS232_ReadByteFromBuffer
     movwf RS232_BUFFER_CHAR, ACCESS
     xorlw 0xFF          ;  0xFF xor char if char was FF then zero bit set. 
