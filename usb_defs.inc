@@ -256,3 +256,10 @@
 
 #define DEVICE_REMOTE_WAKEUP    0x01
 #define ENDPOINT_HALT            0x00
+
+
+;flags for interrupt handler
+#define USB_ERROR          0
+#define USB_ACTIVITY       1
+#define USB_STALL          2
+#define USB_IDLE           3

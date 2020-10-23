@@ -82,7 +82,8 @@
     extern PrintStrFn, PrintDataFn
     extern InitUsartComms, Delay
     extern InterruptServiceRoutine
-
+    extern INTERRUPT_FLAG
+    
     global RS232_RINGBUFFER, RS232_RINGBUFFER_HEAD, RS232_RINGBUFFER_TAIL
     global RS232_Temp_StrLen, RS232_Temp1, RS232_Temp2, RS232_Temp3
     global RS232_Temp4, RS232_Temp5, RS232_Temp6, RS232_Temp7,RS232_Temp8
@@ -160,6 +161,10 @@ PIC_CONFIGURED:
     da "Configured\r\n",0
 IDLE_CONDITION:
     da "Idle\r\n",0
+USBACTIVITY:
+    da "Activity\r\n",0
+USBERROR:
+    da "USBERROR\r\n",0    
 STALL_HANDSHAKE_STR:
     da "Stall\r\n",0
 USB_RESET_STR:
@@ -332,6 +337,23 @@ Descriptor_end
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 ServiceUSB
+    
+  
+ 
+    ifset INTERRUPT_FLAG, USB_ERROR, ACCESS    
+        PrintStr  USBERROR
+    endi
+    
+    ifset INTERRUPT_FLAG, USB_ACTIVITY, ACCESS    
+        PrintStr  USBACTIVITY
+    endi
+    
+    ifset INTERRUPT_FLAG, USB_IDLE, ACCESS    
+        PrintStr  IDLE_CONDITION
+    endi
+    
+    clrf INTERRUPT_FLAG, ACCESS
+    
     select
     caseset UIR, URSTIF, ACCESS    ; USB Reset occurred.
 	PrintStr USB_RESET_STR
@@ -1275,11 +1297,17 @@ InitUSB
     movwf       UIE, ACCESS 
     
     clrf        UIR, ACCESS                ; USB Interrupt Status register - Clear all interrupt flags
+    
     movlw       0x14                       ; UPUEN  = 1 On-chip pull-up on D+, so full speed.
     ; UTRDIS = 1 On-chip transceiver enabled.
     movwf       UCFG, ACCESS
     movlw       0x08                       ; USBEN = 1
     movwf       UCON, ACCESS               ; Enable the USB module and its supporting circuitry
+    
+    bsf PIE2, USBIE, ACCESS		    ; enable interrupts on usb
+    
+    
+    
     banksel     USB_curr_config
     clrf        USB_curr_config, BANKED
     clrf        USB_USWSTAT, BANKED        ; Default to powered state.
@@ -1329,18 +1357,7 @@ Main
     clrf        COUNTER_H, BANKED
 
     repeat
-;        banksel COUNTER_L
-;        incf    COUNTER_L, F, BANKED
-;        ifset STATUS, Z, ACCESS
-;            incf COUNTER_H, F, BANKED
-;        endi
-;        ifset  COUNTER_H, 7, BANKED
-;            bcf PORTA, 1, ACCESS
-;        otherwise
-;            bsf PORTA, 1, ACCESS
-;        endi
         call   ServiceUSB
-
     forever
 
     end

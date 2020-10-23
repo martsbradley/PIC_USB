@@ -1,10 +1,10 @@
     #include p18f2550.inc
     #include engr2210.inc
-
+    #include usb_defs.inc
 ;    ERRORLEVEL -302 ;removes warning message about using proper bank that occured on the line 'CLRF TRISB'
 
 
-    global InterruptServiceRoutine
+    global InterruptServiceRoutine, INTERRUPT_FLAG
      
     extern RS232_ReadByteFromBuffer
 
@@ -22,8 +22,10 @@ FSR2L_TEMP res 1
 
 RS232_BUFFER_CHAR   res 1  ; The Macro PrintString will overwrite these without
  
+INTERRUPT_FLAG res 1	   ; Updated with the details of the interrupt.
+ 
 
-
+ 
    
 INTERRUPT_CODE  code
 ;--------------------------------------------------------------------------
@@ -68,28 +70,39 @@ InterruptTransmitRS232Ready:
     btfsc PIE1, TXIE, ACCESS ;skip if TXIE == 0 because transmission disabled.
     goto SendRS232
     
+    btfss PIR2, USBIF, ACCESS ; 
+    goto InterruptServiceEnd
     
 USBInterruptCheck:    
-    select
-    caseset    UIR, UERRIF, ACCESS    ;  If an Error Condition Interrupt.
+    
+    ifset    UIR, UERRIF, ACCESS    ;  If an Error Condition Interrupt.
         clrf   UEIR, ACCESS           ;  Clear the error in software.
-        break
-    caseset    UIR, SOFIF, ACCESS     ;  Start of Frame token received by SIE
-        bcf    UIR, SOFIF, ACCESS     ;  Clear this flag
-        break
-    caseset    UIR, STALLIF, ACCESS   ; A stall handshake was sent by the SIE
-        bcf    UIR, STALLIF, ACCESS   ; clear the stall handshake
-        break	
-    caseset    UIR,  IDLEIF, ACCESS   ;  Idle condition detected (been idle for 3ms or more)
-        bcf    UIR,  IDLEIF, ACCESS   ;  Clear that idle condition.
-        bsf    UCON, SUSPND, ACCESS   ;  Suspend the SIE to conserve power.
-        break
-    caseset UIR, ACTVIF, ACCESS       ;  There was activity on the USB
-        bcf    UIR, ACTVIF, ACCESS    ;  Clear the activity detection flag.
-        bcf    UCON, SUSPND, ACCESS   ;  Unsuspend the SIE.
-        break
-     ends
-     goto InterruptServiceEnd
+	bsf INTERRUPT_FLAG, USB_ERROR, ACCESS
+    endi
+    
+    ifset   UIR, SOFIF, ACCESS     ;  Start of Frame token received by SIE
+        bcf UIR, SOFIF, ACCESS     ;  Clear this flag
+    endi
+    
+    ifset   UIR, STALLIF, ACCESS   ; A stall handshake was sent by the SIE
+        bcf UIR, STALLIF, ACCESS   ; clear the stall handshake
+	bsf INTERRUPT_FLAG, USB_STALL, ACCESS
+    endi	
+    
+    ifset   UIR,  IDLEIF, ACCESS   ;  Idle condition detected (been idle for 3ms or more)
+        bcf UIR,  IDLEIF, ACCESS   ;  Clear that idle condition.
+        bsf UCON, SUSPND, ACCESS   ;  Suspend the SIE to conserve power.
+	bsf INTERRUPT_FLAG, USB_IDLE, ACCESS
+    endi
+    
+    ifset   UIR, ACTVIF, ACCESS    ;  There was activity on the USB
+        bcf UIR, ACTVIF, ACCESS    ;  Clear the activity detection flag.
+        bcf UCON, SUSPND, ACCESS   ;  Unsuspend the SIE.
+	bsf INTERRUPT_FLAG, USB_ACTIVITY, ACCESS
+    endi
+    
+    bcf PIR2, USBIF, ACCESS	   ;  Clear the USB Interrupt flag.
+    goto InterruptServiceEnd
     
     
 SendRS232:
