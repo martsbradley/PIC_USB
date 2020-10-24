@@ -259,7 +259,14 @@
 
 
 ;flags for interrupt handler
-#define USB_ERROR          0
-#define USB_ACTIVITY       1
-#define USB_STALL          2
-#define USB_IDLE           3
+#define USB_ERROR_FLAG_BIT          0
+#define USB_ACTIVITY_FLAG_BIT       1
+#define USB_STALL_FLAG_BIT          2
+#define USB_IDLE_FLAG_BIT           3
+#define USB_RESET_FLAG_BIT          4
+    
+; USB Buffer Status Register Bits
+#define SIE_DTS_DTSEN  0xC8   ;1100 1000
+#define SIE_DTSEN      0x88   ;1000 1000
+#define SIE_STALL      0x84   ;1000 0100
+#define CPU_DTSEN      0x08   ;0000 1000

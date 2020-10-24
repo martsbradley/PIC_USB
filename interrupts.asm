@@ -7,7 +7,11 @@
     global InterruptServiceRoutine, INTERRUPT_FLAG
      
     extern RS232_ReadByteFromBuffer
-
+    extern clearNonControlEndPoints, setupEndpoint0
+    
+    ; should consider putting these usb registers into the access bank.
+    extern USB_curr_config,USB_USWSTAT,USB_device_status
+    
 ACCESS_DATA  udata_acs
 PCLATH_TEMP  res 1
 
@@ -77,7 +81,7 @@ USBInterruptCheck:
     
     ifset    UIR, UERRIF, ACCESS    ;  If an Error Condition Interrupt.
         clrf   UEIR, ACCESS           ;  Clear the error in software.
-	bsf INTERRUPT_FLAG, USB_ERROR, ACCESS
+	bsf INTERRUPT_FLAG, USB_ERROR_FLAG_BIT, ACCESS
     endi
     
     ifset   UIR, SOFIF, ACCESS     ;  Start of Frame token received by SIE
@@ -86,20 +90,67 @@ USBInterruptCheck:
     
     ifset   UIR, STALLIF, ACCESS   ; A stall handshake was sent by the SIE
         bcf UIR, STALLIF, ACCESS   ; clear the stall handshake
-	bsf INTERRUPT_FLAG, USB_STALL, ACCESS
+	bsf INTERRUPT_FLAG, USB_STALL_FLAG_BIT, ACCESS
     endi	
     
     ifset   UIR,  IDLEIF, ACCESS   ;  Idle condition detected (been idle for 3ms or more)
         bcf UIR,  IDLEIF, ACCESS   ;  Clear that idle condition.
         bsf UCON, SUSPND, ACCESS   ;  Suspend the SIE to conserve power.
-	bsf INTERRUPT_FLAG, USB_IDLE, ACCESS
+	bsf INTERRUPT_FLAG, USB_IDLE_FLAG_BIT, ACCESS
     endi
     
     ifset   UIR, ACTVIF, ACCESS    ;  There was activity on the USB
         bcf UIR, ACTVIF, ACCESS    ;  Clear the activity detection flag.
         bcf UCON, SUSPND, ACCESS   ;  Unsuspend the SIE.
-	bsf INTERRUPT_FLAG, USB_ACTIVITY, ACCESS
+	bsf INTERRUPT_FLAG, USB_ACTIVITY_FLAG_BIT, ACCESS
     endi
+    
+    ifset UIR, URSTIF, ACCESS    ; USB Reset occurred.
+        banksel USB_curr_config
+        clrf    USB_curr_config, BANKED
+        bcf     UIR, TRNIF, ACCESS    ; clear TRNIF four times to clear out the USTAT FIFO
+        bcf     UIR, TRNIF, ACCESS
+        bcf     UIR, TRNIF, ACCESS
+        bcf     UIR, TRNIF, ACCESS
+
+        clrf    UEP0, ACCESS          ; clear all EP control registers
+
+        call clearNonControlEndPoints
+        call setupEndpoint0
+
+        clrf    UADDR, ACCESS         ; set USB Address to 0
+        clrf    UIR, ACCESS           ; clear all the USB interrupt flags
+
+        movlw   0xFF
+        movwf   UEIE, ACCESS          ; Enable all usb error interrupts
+        banksel USB_USWSTAT
+        movlw   DEFAULT_STATE         ; Enter default state since this is a reset.
+        movwf   USB_USWSTAT, BANKED
+        movlw   0x01                  ; Self powered, remote wakeup disabled
+        movwf   USB_device_status, BANKED
+	
+	#ifdef SHOW_ENUM_STATUS
+        movlw   0xE0
+        andwf   PORTB, F, ACCESS
+        bsf     PORTB, 1, ACCESS      ; set bit 1 of PORTB to indicate Powered state
+	#endif
+	bsf INTERRUPT_FLAG, USB_RESET_FLAG_BIT, ACCESS
+    endi    
+    
+	
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
     
     bcf PIR2, USBIF, ACCESS	   ;  Clear the USB Interrupt flag.
     goto InterruptServiceEnd

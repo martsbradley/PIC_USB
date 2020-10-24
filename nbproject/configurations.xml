@@ -20,6 +20,7 @@
       <itemPath>delay.asm</itemPath>
       <itemPath>interrupts.asm</itemPath>
       <itemPath>rs232.inc</itemPath>
+      <itemPath>usb.asm</itemPath>
     </logicalFolder>
     <logicalFolder name="ExternalFiles"
                    displayName="Important Files"

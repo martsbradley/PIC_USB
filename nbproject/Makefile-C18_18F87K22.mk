@@ -57,17 +57,17 @@ OBJECTDIR=build/${CND_CONF}/${IMAGE_TYPE}
 DISTDIR=dist/${CND_CONF}/${IMAGE_TYPE}
 
 # Source Files Quoted if spaced
-SOURCEFILES_QUOTED_IF_SPACED=rs232.asm main.asm delay.asm interrupts.asm
+SOURCEFILES_QUOTED_IF_SPACED=rs232.asm main.asm delay.asm interrupts.asm usb.asm
 
 # Object Files Quoted if spaced
-OBJECTFILES_QUOTED_IF_SPACED=${OBJECTDIR}/rs232.o ${OBJECTDIR}/main.o ${OBJECTDIR}/delay.o ${OBJECTDIR}/interrupts.o
-POSSIBLE_DEPFILES=${OBJECTDIR}/rs232.o.d ${OBJECTDIR}/main.o.d ${OBJECTDIR}/delay.o.d ${OBJECTDIR}/interrupts.o.d
+OBJECTFILES_QUOTED_IF_SPACED=${OBJECTDIR}/rs232.o ${OBJECTDIR}/main.o ${OBJECTDIR}/delay.o ${OBJECTDIR}/interrupts.o ${OBJECTDIR}/usb.o
+POSSIBLE_DEPFILES=${OBJECTDIR}/rs232.o.d ${OBJECTDIR}/main.o.d ${OBJECTDIR}/delay.o.d ${OBJECTDIR}/interrupts.o.d ${OBJECTDIR}/usb.o.d
 
 # Object Files
-OBJECTFILES=${OBJECTDIR}/rs232.o ${OBJECTDIR}/main.o ${OBJECTDIR}/delay.o ${OBJECTDIR}/interrupts.o
+OBJECTFILES=${OBJECTDIR}/rs232.o ${OBJECTDIR}/main.o ${OBJECTDIR}/delay.o ${OBJECTDIR}/interrupts.o ${OBJECTDIR}/usb.o
 
 # Source Files
-SOURCEFILES=rs232.asm main.asm delay.asm interrupts.asm
+SOURCEFILES=rs232.asm main.asm delay.asm interrupts.asm usb.asm
 
 
 
@@ -127,6 +127,14 @@ ${OBJECTDIR}/interrupts.o: interrupts.asm  nbproject/Makefile-${CND_CONF}.mk
 	@${DEP_GEN} -d "${OBJECTDIR}/interrupts.o"
 	@${FIXDEPS} "${OBJECTDIR}/interrupts.o.d" $(SILENT) -rsi ${MP_AS_DIR} -c18 
 	
+${OBJECTDIR}/usb.o: usb.asm  nbproject/Makefile-${CND_CONF}.mk
+	@${MKDIR} "${OBJECTDIR}" 
+	@${RM} ${OBJECTDIR}/usb.o.d 
+	@${RM} ${OBJECTDIR}/usb.o 
+	@${FIXDEPS} dummy.d -e "${OBJECTDIR}/usb.err" $(SILENT) -c ${MP_AS} $(MP_EXTRA_AS_PRE) -d__DEBUG -d__MPLAB_DEBUGGER_PK3=1 -q -p$(MP_PROCESSOR_OPTION) -u  -l\\\"${OBJECTDIR}/usb.lst\\\" -e\\\"${OBJECTDIR}/usb.err\\\" $(ASM_OPTIONS)    -o\\\"${OBJECTDIR}/usb.o\\\" \\\"usb.asm\\\" 
+	@${DEP_GEN} -d "${OBJECTDIR}/usb.o"
+	@${FIXDEPS} "${OBJECTDIR}/usb.o.d" $(SILENT) -rsi ${MP_AS_DIR} -c18 
+	
 else
 ${OBJECTDIR}/rs232.o: rs232.asm  nbproject/Makefile-${CND_CONF}.mk
 	@${MKDIR} "${OBJECTDIR}" 
@@ -159,6 +167,14 @@ ${OBJECTDIR}/interrupts.o: interrupts.asm  nbproject/Makefile-${CND_CONF}.mk
 	@${FIXDEPS} dummy.d -e "${OBJECTDIR}/interrupts.err" $(SILENT) -c ${MP_AS} $(MP_EXTRA_AS_PRE) -q -p$(MP_PROCESSOR_OPTION) -u  -l\\\"${OBJECTDIR}/interrupts.lst\\\" -e\\\"${OBJECTDIR}/interrupts.err\\\" $(ASM_OPTIONS)    -o\\\"${OBJECTDIR}/interrupts.o\\\" \\\"interrupts.asm\\\" 
 	@${DEP_GEN} -d "${OBJECTDIR}/interrupts.o"
 	@${FIXDEPS} "${OBJECTDIR}/interrupts.o.d" $(SILENT) -rsi ${MP_AS_DIR} -c18 
+	
+${OBJECTDIR}/usb.o: usb.asm  nbproject/Makefile-${CND_CONF}.mk
+	@${MKDIR} "${OBJECTDIR}" 
+	@${RM} ${OBJECTDIR}/usb.o.d 
+	@${RM} ${OBJECTDIR}/usb.o 
+	@${FIXDEPS} dummy.d -e "${OBJECTDIR}/usb.err" $(SILENT) -c ${MP_AS} $(MP_EXTRA_AS_PRE) -q -p$(MP_PROCESSOR_OPTION) -u  -l\\\"${OBJECTDIR}/usb.lst\\\" -e\\\"${OBJECTDIR}/usb.err\\\" $(ASM_OPTIONS)    -o\\\"${OBJECTDIR}/usb.o\\\" \\\"usb.asm\\\" 
+	@${DEP_GEN} -d "${OBJECTDIR}/usb.o"
+	@${FIXDEPS} "${OBJECTDIR}/usb.o.d" $(SILENT) -rsi ${MP_AS_DIR} -c18 
 	
 endif
 
