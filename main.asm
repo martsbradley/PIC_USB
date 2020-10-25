@@ -115,6 +115,7 @@ USB_loop_index        res 1
 USB_packet_length     res 1
 USB_USTAT             res 1 ; Saved copy of USTAT special function register in memory.
 ENDPOINT_ID           res 1 ;
+DATA_LENGTH           res 1
 USB_USWSTAT           res 1 ; Current state POWERED_STATE|DEFAULT_STATE|ADDRESS_STATE|CONFIG_STATE
 COUNTER_L             res 1
 COUNTER_H             res 1
@@ -406,6 +407,7 @@ ServiceUSBExec:
             break
         case TOKEN_OUT
             call copyPayloadToBufferData 
+            movwf DATA_LENGTH, BANKED
             bsf UIE, TRNIE, ACCESS
 
             movf ENDPOINT_ID, W, BANKED
@@ -1064,8 +1066,9 @@ ProcessOutToken
 	break
     case EP1
         ; Receive data from the host and send it out on RS232.
+        PrintStr EP1OutStr
 
-	call copyPayloadToBufferData
+        movf DATA_LENGTH,W, BANKED; 
         PrintData USB_BufferData
 
 	banksel BD1OBC
