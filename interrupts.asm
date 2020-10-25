@@ -82,27 +82,32 @@ USBInterruptCheck:
     ifset    UIR, UERRIF, ACCESS    ;  If an Error Condition Interrupt.
         clrf   UEIR, ACCESS           ;  Clear the error in software.
 	bsf INTERRUPT_FLAG, USB_ERROR_FLAG_BIT, ACCESS
+        goto USBInterruptHandled
     endi
     
     ifset   UIR, SOFIF, ACCESS     ;  Start of Frame token received by SIE
         bcf UIR, SOFIF, ACCESS     ;  Clear this flag
+        goto USBInterruptHandled
     endi
     
     ifset   UIR, STALLIF, ACCESS   ; A stall handshake was sent by the SIE
         bcf UIR, STALLIF, ACCESS   ; clear the stall handshake
 	bsf INTERRUPT_FLAG, USB_STALL_FLAG_BIT, ACCESS
+        goto USBInterruptHandled
     endi	
     
     ifset   UIR,  IDLEIF, ACCESS   ;  Idle condition detected (been idle for 3ms or more)
         bcf UIR,  IDLEIF, ACCESS   ;  Clear that idle condition.
         bsf UCON, SUSPND, ACCESS   ;  Suspend the SIE to conserve power.
 	bsf INTERRUPT_FLAG, USB_IDLE_FLAG_BIT, ACCESS
+        goto USBInterruptHandled
     endi
     
     ifset   UIR, ACTVIF, ACCESS    ;  There was activity on the USB
         bcf UIR, ACTVIF, ACCESS    ;  Clear the activity detection flag.
         bcf UCON, SUSPND, ACCESS   ;  Unsuspend the SIE.
 	bsf INTERRUPT_FLAG, USB_ACTIVITY_FLAG_BIT, ACCESS
+        goto USBInterruptHandled
     endi
     
     ifset UIR, URSTIF, ACCESS    ; USB Reset occurred.
@@ -135,26 +140,14 @@ USBInterruptCheck:
         bsf     PORTB, 1, ACCESS      ; set bit 1 of PORTB to indicate Powered state
 	#endif
 	bsf INTERRUPT_FLAG, USB_RESET_FLAG_BIT, ACCESS
+        goto USBInterruptHandled
     endi    
     
-	
     
     
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
-    
+USBInterruptHandled:
     bcf PIR2, USBIF, ACCESS	   ;  Clear the USB Interrupt flag.
     goto InterruptServiceEnd
-    
     
 SendRS232:
     call  RS232_ReadByteFromBuffer

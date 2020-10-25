@@ -264,6 +264,7 @@
 #define USB_STALL_FLAG_BIT          2
 #define USB_IDLE_FLAG_BIT           3
 #define USB_RESET_FLAG_BIT          4
+#define USB_TRNIE_FLAG_BIT          5
     
 ; USB Buffer Status Register Bits
 #define SIE_DTS_DTSEN  0xC8   ;1100 1000

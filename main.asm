@@ -167,7 +167,7 @@ USBACTIVITY:
     da "Activity\r\n",0
 USBERROR:
     da "USBERROR\r\n",0    
-STALL_HANDSHAKE_STR:
+USB_STALL_STR:
     da "Stall\r\n",0
 USB_RESET_STR:
     da "Reset\r\n",0
@@ -182,6 +182,8 @@ REQ_SET_DEVICE_ADDRESS_STR:
     da "Request Set Dev Addr\r\n",0
 SET_DEVICE_ADDRESS_STR:
     da "Confirm Dev Addr\r\n",0
+ServiceUSBLoop:
+    da "SrvLoop\r\n",0
 
 
 USBSTUFF    code
@@ -340,28 +342,48 @@ Descriptor_end
 
 ServiceUSB
     
+    movf INTERRUPT_FLAG, F, ACCESS  ; update zero flag.
+    bnz ServiceUSBPrint ; if not zero print details 
+    goto ServiceUSBExec  ; else just check the TRNIF
+
+ServiceUSBPrint:
+
+
+    PrintStr  ServiceUSBLoop
   
  
     ifset INTERRUPT_FLAG, USB_ERROR_FLAG_BIT, ACCESS    
         PrintStr  USBERROR
+        bcf INTERRUPT_FLAG, USB_ERROR_FLAG_BIT, ACCESS
+    endi
+
+    ifset INTERRUPT_FLAG, USB_IDLE_FLAG_BIT, ACCESS    
+        PrintStr  IDLE_CONDITION
+        bcf INTERRUPT_FLAG, USB_IDLE_FLAG_BIT, ACCESS
     endi
     
     ifset INTERRUPT_FLAG, USB_ACTIVITY_FLAG_BIT, ACCESS    
         PrintStr  USBACTIVITY
-    endi
-    
-    ifset INTERRUPT_FLAG, USB_IDLE_FLAG_BIT, ACCESS    
-        PrintStr  IDLE_CONDITION
+        bcf INTERRUPT_FLAG, USB_ACTIVITY_FLAG_BIT, ACCESS
     endi
     
     ifset INTERRUPT_FLAG, USB_RESET_FLAG_BIT, ACCESS    
         PrintStr  USB_RESET_STR
+        bcf INTERRUPT_FLAG, USB_RESET_FLAG_BIT, ACCESS
     endi
-    
-    clrf INTERRUPT_FLAG, ACCESS
+
+    ifset INTERRUPT_FLAG, USB_STALL_FLAG_BIT, ACCESS    
+        PrintStr  USB_STALL_STR
+        bcf INTERRUPT_FLAG, USB_STALL_FLAG_BIT, ACCESS
+    endi
+
+ServiceUSBExec:
+
     
     
     ifset  UIR, TRNIF, ACCESS    ; Processing of pending transaction is complete;
+        bcf INTERRUPT_FLAG, USB_TRNIE_FLAG_BIT, ACCESS
+
         movlw    0x04              ; Buffer Descriptor table starts at Address 0x0400
         movwf    FSR0H, ACCESS     ; Indirect addressing, copy in high byte.
         movf     USTAT, W, ACCESS  ; Read USTAT register for endpoint information
