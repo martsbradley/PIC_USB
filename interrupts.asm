@@ -97,17 +97,29 @@ USBInterruptCheck:
     endi	
     
     ifset   UIR,  IDLEIF, ACCESS   ;  Idle condition detected (been idle for 3ms or more)
-        bcf UIR,  IDLEIF, ACCESS   ;  Clear that idle condition.
+
+        bsf UIE, ACTVIE, ACCESS    ;  Unmask the activity interrupt.
         bsf UCON, SUSPND, ACCESS   ;  Suspend the SIE to conserve power.
+        bcf UIR,  IDLEIF, ACCESS   ;  Clear that idle condition.
+
 	bsf INTERRUPT_FLAG, USB_IDLE_FLAG_BIT, ACCESS
         goto USBInterruptHandled
     endi
     
     ifset   UIR, ACTVIF, ACCESS    ;  There was activity on the USB
-        bcf UIR, ACTVIF, ACCESS    ;  Clear the activity detection flag.
         bcf UCON, SUSPND, ACCESS   ;  Unsuspend the SIE.
-	bsf INTERRUPT_FLAG, USB_ACTIVITY_FLAG_BIT, ACCESS
-        goto USBInterruptHandled
+
+USB_ACTIVITYWAKEUPLOOP:            ; Datasheet said
+        btfss UIR, ACTVIF, ACCESS  ; Need to keep trying to clear the
+        bra USB_ACTIVITYWAKEUP_DONE; flag after a suspend.
+        bcf UIR, ACTVIF, ACCESS
+        bra USB_ACTIVITYWAKEUPLOOP
+USB_ACTIVITYWAKEUP_DONE:
+
+
+       bcf UIE, ACTVIE, ACCESS    ;  Mask the activity interrupt.
+       bsf INTERRUPT_FLAG, USB_ACTIVITY_FLAG_BIT, ACCESS
+       goto USBInterruptHandled
     endi
     
     ifset UIR, URSTIF, ACCESS    ; USB Reset occurred.
