@@ -167,7 +167,7 @@ PIC_CONFIGURED:
 IDLE_CONDITION:
     da "Idle\r\n",0
 USB_TRNIESTR
-    da "Tnx Done\r\n",0
+    da "Txn Done\r\n",0
 USBACTIVITY:
     da "Activity\r\n",0
 USBERROR:
@@ -354,7 +354,7 @@ ServiceUSB
 ServiceUSBPrint:
 
 
-    PrintStr  ServiceUSBLoop
+    ;PrintStr  ServiceUSBLoop
   
  
     ifset INTERRUPT_FLAG, USB_ERROR_FLAG_BIT, ACCESS    
@@ -386,7 +386,7 @@ ServiceUSBExec:
 
     ifset INTERRUPT_FLAG, USB_TRNIE_FLAG_BIT, ACCESS    
 
-        PrintStr  USB_TRNIESTR
+        ;PrintStr  USB_TRNIESTR
         bcf INTERRUPT_FLAG, USB_TRNIE_FLAG_BIT, ACCESS
     
         banksel USB_USTAT
@@ -1008,7 +1008,7 @@ ProcessInToken
     case EP1
 	break
     case EP2
-        PrintStr EP2InStr
+        ;PrintStr EP2InStr
 	;Send something to the host over USB.
 
         movlw   low (USB_Buffer+  4*MAX_PACKET_SIZE)
@@ -1066,7 +1066,8 @@ ProcessOutToken
 	break
     case EP1
         ; Receive data from the host and send it out on RS232.
-        PrintStr EP1OutStr
+
+        ;PrintStr EP1OutStr
 
         movf DATA_LENGTH,W, BANKED; 
         PrintData USB_BufferData

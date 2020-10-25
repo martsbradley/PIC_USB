@@ -68,7 +68,8 @@ public class InterruptHandler implements Consumer<DeviceHandle> {
          
                           //1       2       3       4       5       6      7        
                           //12345678123456781234567812345678123456781234567812345678
-        String myString = "the lazy dog jumped over the brown foX|\r\n";
+        //String myString = "the lazy dog jumped over the brown foX|\r\n";
+        String myString = "over the brown foX|\r\n";
 
         size= myString.length();
         
