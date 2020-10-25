@@ -86,6 +86,7 @@
     global RS232_Temp4, RS232_Temp5, RS232_Temp6, RS232_Temp7,RS232_Temp8
     global USB_curr_config,USB_USWSTAT,USB_device_status
     global CounterA, CounterB
+    global USB_BufferDescriptor, USB_USTAT, USB_error_flags
     
 mybank1 udata   0x300
 RS232_RINGBUFFER      res SIZE         ;  this should be aligned on a byte.
@@ -113,6 +114,7 @@ USB_bytes_left        res 1
 USB_loop_index        res 1
 USB_packet_length     res 1
 USB_USTAT             res 1 ; Saved copy of USTAT special function register in memory.
+ENDPOINT_ID           res 1 ;
 USB_USWSTAT           res 1 ; Current state POWERED_STATE|DEFAULT_STATE|ADDRESS_STATE|CONFIG_STATE
 COUNTER_L             res 1
 COUNTER_H             res 1
@@ -163,6 +165,8 @@ PIC_CONFIGURED:
     da "Configured\r\n",0
 IDLE_CONDITION:
     da "Idle\r\n",0
+USB_TRNIESTR
+    da "Tnx Done\r\n",0
 USBACTIVITY:
     da "Activity\r\n",0
 USBERROR:
@@ -379,64 +383,44 @@ ServiceUSBPrint:
 
 ServiceUSBExec:
 
-    
-    
-    ifset  UIR, TRNIF, ACCESS    ; Processing of pending transaction is complete;
+    ifset INTERRUPT_FLAG, USB_TRNIE_FLAG_BIT, ACCESS    
+
+        PrintStr  USB_TRNIESTR
         bcf INTERRUPT_FLAG, USB_TRNIE_FLAG_BIT, ACCESS
+    
+        banksel USB_USTAT
+        movf  USB_USTAT, W, BANKED
+        andlw 0x18        ; extract the EP bits
+        movwf ENDPOINT_ID, BANKED
 
-        movlw    0x04              ; Buffer Descriptor table starts at Address 0x0400
-        movwf    FSR0H, ACCESS     ; Indirect addressing, copy in high byte.
-        movf     USTAT, W, ACCESS  ; Read USTAT register for endpoint information
-        andlw    0x7C              ; Mask out bits other than Endpoint and Direction
-        movwf    FSR0L, ACCESS     ;    0000100 0EEEED00 (FSR0H-FSR0L)
-        banksel  USB_BufferDescriptor   ; eg 0000100 00000000 EP0 Out -> 0x400  // are in and out in the correct order
-        movf     POSTINC0, W, ACCESS    ;    0000100 00000100 EP0 IN  -> 0x404
-                                        ;    0000100 00001000 EP1 Out -> 0x408
-                                        ;    0000100 00001100 EP1 In  -> 0x40C
-        movwf    USB_BufferDescriptor, BANKED  ; Copy received data to USB_BufferDescriptor
-        movf     POSTINC0, W, ACCESS
-        movwf    USB_BufferDescriptor+1, BANKED
-        movf     POSTINC0, W, ACCESS
-        movwf    USB_BufferDescriptor+2, BANKED
-        movf     POSTINC0, W, ACCESS
-        movwf    USB_BufferDescriptor+3, BANKED ; USB_BufferDescriptor now populated.
-        movf     USTAT, W, ACCESS
-        movwf    USB_USTAT, BANKED  ; Save the USB status register
-        bcf      UIR, TRNIF, ACCESS ; Clear transaction complete interrupt flag
-                                    ; USTAT FIFO can advance.
-#ifdef SHOW_ENUM_STATUS
-        andlw    0x18               ; Endpoint bits ENDP1:ENDP0 from USTAT register
-        select                      ; Which endpoint was handled.
-            case EP0
-                movlw  0x20       ;0010 0000 pin 5, my red led.. for control End point.
-                break
-            case EP1
-                movlw  0x40       ;0100 0000 pin 6
-                break
-            case EP2
-                movlw  0x80       ;1000 000  pin 7
-                break
-        ends
-        xorwf   PORTB, F, ACCESS    ; toggle bit 5, 6, or 7 to reflect EP activity
-#endif
-        clrf    USB_error_flags, BANKED    ; clear USB error flags
+        movf  USB_BufferDescriptor, W, BANKED
+                               ; The PID is presented by the SIE in the BDnSTAT
+        andlw 0x3C             ; extract PID bits 0011 1100 (PID3:PID2:PID1:PID0)
 
-
-        movf    USB_BufferDescriptor, W, BANKED
-                                 ; The PID is presented by the SIE in the BDnSTAT
-        andlw   0x3C             ; extract PID bits 0011 1100 (PID3:PID2:PID1:PID0)
 
         select
         case TOKEN_SETUP
+            call copyPayloadToBufferData  
+            bsf UIE, TRNIE, ACCESS
             call        ProcessSetupToken
             break
-        case TOKEN_IN
-            call        ProcessInToken
-            break
         case TOKEN_OUT
+            call copyPayloadToBufferData 
+            bsf UIE, TRNIE, ACCESS
+
+            movf ENDPOINT_ID, W, BANKED
             call        ProcessOutToken
             break
+        case TOKEN_IN
+            bsf UIE, TRNIE, ACCESS
+
+            movf ENDPOINT_ID, W, BANKED
+            call        ProcessInToken
+            break
         ends
+
+        bsf UIE, TRNIE, ACCESS
+
         banksel USB_error_flags
         ifset USB_error_flags, 0, BANKED    ; if there was a Request Error...
             PrintStr PROCESS_ERR
@@ -449,11 +433,11 @@ ServiceUSBExec:
         endi
         
     endi
+
     return
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ProcessSetupToken
 
-    call copyPayloadToBufferData
 
     banksel  BD0OBC
     movlw    MAX_PACKET_SIZE
@@ -984,9 +968,6 @@ VendorRequests
 
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ProcessInToken
-    banksel USB_USTAT
-    movf  USB_USTAT, W, BANKED
-    andlw 0x18        ; extract the EP bits
 
     select
     case EP0
@@ -1072,9 +1053,6 @@ UpdateBufferStatus:
 ;++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 ;	    Receive data from the Host.
 ProcessOutToken
-    banksel  USB_USTAT
-    movf     USB_USTAT, W, BANKED
-    andlw    0x18        ; extract the EP bits
     select
     case EP0
 	banksel BD0OBC
@@ -1214,7 +1192,7 @@ InitUSB
     PrintStr USB_INITIALISED
     ;clrf        UIE, ACCESS                ; USB Interrupt Enable register - Mask all USB interrupts
     
-    movlw       0x77           ;SOFIE STALLIE IDLEIE ACTVIE & UERRIE, URSTIE enabled
+    movlw       0x7F           ;SOFIE STALLIE IDLEIE TRNIE ACTVIE  UERRIE, URSTIE enabled
     movwf       UIE, ACCESS 
     
     clrf        UIR, ACCESS                ; USB Interrupt Status register - Clear all interrupt flags
@@ -1225,7 +1203,9 @@ InitUSB
     movlw       0x08                       ; USBEN = 1
     movwf       UCON, ACCESS               ; Enable the USB module and its supporting circuitry
     
-    bsf PIE2, USBIE, ACCESS		    ; enable interrupts on usb
+
+    clrf INTERRUPT_FLAG, ACCESS            ; clear the flags on startup
+    bsf PIE2, USBIE, ACCESS		   ; enable interrupts on usb
     
     
     

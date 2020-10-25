@@ -11,6 +11,7 @@
     
     ; should consider putting these usb registers into the access bank.
     extern USB_curr_config,USB_USWSTAT,USB_device_status
+    extern USB_BufferDescriptor, USB_USTAT, USB_error_flags
     
 ACCESS_DATA  udata_acs
 PCLATH_TEMP  res 1
@@ -27,6 +28,8 @@ FSR2L_TEMP res 1
 RS232_BUFFER_CHAR   res 1  ; The Macro PrintString will overwrite these without
  
 INTERRUPT_FLAG res 1	   ; Updated with the details of the interrupt.
+FSR0H_TEMP  res 1
+FSR0L_TEMP  res 1
  
 
  
@@ -49,6 +52,7 @@ InterruptServiceRoutine:
 
     CLRF PCLATH                ;zero, regardless of current page
 
+
     MOVF TBLPTRU, W            ; save table pointer registers.
     MOVWF TBLPTRU_TEMP, ACCESS
 
@@ -61,11 +65,19 @@ InterruptServiceRoutine:
     MOVF TABLAT, W
     MOVWF TABLAT_TEMP, ACCESS
 
-    MOVF FSR2H, W
+    MOVF  FSR2H, W
     MOVWF FSR2H_TEMP, ACCESS
 
-    MOVF FSR2L, W
+    MOVF  FSR2L, W
     MOVWF FSR2L_TEMP, ACCESS
+
+    MOVF  FSR0H, W
+    MOVWF FSR0H_TEMP, ACCESS
+
+    MOVF  FSR0L, W
+    MOVWF FSR0L_TEMP, ACCESS
+
+
 
 InterruptTransmitRS232Ready:
     btfss PIR1, TXIF, ACCESS ;skip if TXIF == 1 means ready to send another byte.
@@ -154,7 +166,39 @@ USB_ACTIVITYWAKEUP_DONE:
 	bsf INTERRUPT_FLAG, USB_RESET_FLAG_BIT, ACCESS
         goto USBInterruptHandled
     endi    
-    
+
+
+    ifset  UIR, TRNIF, ACCESS    ; Processing of pending transaction is complete;
+
+        movlw    0x04              ; Buffer Descriptor table starts at Address 0x0400
+        movwf    FSR0H, ACCESS     ; Indirect addressing, copy in high byte.
+        movf     USTAT, W, ACCESS  ; Read USTAT register for endpoint information
+        andlw    0x7C              ; Mask out bits other than Endpoint and Direction
+        movwf    FSR0L, ACCESS     ;    0000100 0EEEED00 (FSR0H-FSR0L)
+        banksel  USB_BufferDescriptor   ; eg 0000100 00000000 EP0 Out -> 0x400  
+        movf     POSTINC0, W, ACCESS    ;    0000100 00000100 EP0 IN  -> 0x404
+                                        ;    0000100 00001000 EP1 Out -> 0x408
+                                        ;    0000100 00001100 EP1 In  -> 0x40C
+        movwf    USB_BufferDescriptor, BANKED  ; Copy received data to USB_BufferDescriptor
+        movf     POSTINC0, W, ACCESS
+        movwf    USB_BufferDescriptor+1, BANKED
+        movf     POSTINC0, W, ACCESS
+        movwf    USB_BufferDescriptor+2, BANKED
+        movf     POSTINC0, W, ACCESS
+        movwf    USB_BufferDescriptor+3, BANKED ; USB_BufferDescriptor now populated.
+        movf     USTAT, W, ACCESS
+        movwf    USB_USTAT, BANKED  ; Save the USB status register
+        bcf      UIR, TRNIF, ACCESS ; Clear transaction complete interrupt flag
+                                    ; USTAT FIFO can advance.
+        clrf    USB_error_flags, BANKED    ; clear USB error flags
+
+        bsf INTERRUPT_FLAG, USB_TRNIE_FLAG_BIT, ACCESS
+        bcf UIE, TRNIE, ACCESS   ; stop taking futher interrupts.
+        bcf UIR, TRNIF, ACCESS   ; clear the interrupt flag.
+
+        goto USBInterruptHandled
+
+    endi
     
     
 USBInterruptHandled:
@@ -184,11 +228,19 @@ InterruptRS232TxDone:
 
 InterruptServiceEnd:
 
+    movf  FSR0H_TEMP, W, ACCESS
+    movwf FSR0H, ACCESS
+        
+    movf  FSR0L_TEMP, W, ACCESS
+    movwf FSR0L, ACCESS
+
     movf FSR2H_TEMP, W
     movwf FSR2H, ACCESS
 
     movf FSR2L_TEMP, W            
     movwf FSR2L, ACCESS
+
+
 
     movf TABLAT_TEMP, W   ; restore table pointer registers.
     movwf TABLAT, ACCESS
@@ -201,6 +253,7 @@ InterruptServiceEnd:
 
     movf TBLPTRU_TEMP, W            
     movwf TBLPTRU, ACCESS
+
 
     movf  PCLATH_TEMP, W
     movwf PCLATH, ACCESS
