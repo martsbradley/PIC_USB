@@ -1,10 +1,8 @@
 #include <p18f2550.inc>
  
      global Delay
+     extern CounterA, CounterB
 
-BANK0 udata
-CounterA  res 1     ; string being printed.
-CounterB  res 1
   
 PROG  code
 

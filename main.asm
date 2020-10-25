@@ -85,6 +85,7 @@
     global RS232_Temp_StrLen, RS232_Temp1, RS232_Temp2, RS232_Temp3
     global RS232_Temp4, RS232_Temp5, RS232_Temp6, RS232_Temp7,RS232_Temp8
     global USB_curr_config,USB_USWSTAT,USB_device_status
+    global CounterA, CounterB
     
 mybank1 udata   0x300
 RS232_RINGBUFFER      res SIZE         ;  this should be aligned on a byte.
@@ -115,6 +116,9 @@ USB_USTAT             res 1 ; Saved copy of USTAT special function register in m
 USB_USWSTAT           res 1 ; Current state POWERED_STATE|DEFAULT_STATE|ADDRESS_STATE|CONFIG_STATE
 COUNTER_L             res 1
 COUNTER_H             res 1
+CounterA              res 1 ; Delay counters.
+CounterB              res 1
+
 
 LAUNCH_PROGRAM code     0x00
     goto        Main                    ; Reset vector
